@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-be-vietnam-pro);
+
+  /* Palette extracted from docs/design/tara-shop-prototype-notes.md */
+  --color-primary: #8b6fc7;
+  --color-primary-dark: #6b4fa8;
+  --color-primary-tint: #f1eafb;
+  --color-primary-light: #c3aee6;
+
+  --color-page: #ededf2;
+  --color-surface: #f6f4f9;
+  --color-line: #e7e3ee;
+  --color-ink: #211b2b;
+  --color-muted: #7a7288;
+  --color-nav-inactive: #8a8398;
+
+  --color-pending: #b07908;
+  --color-pending-bg: #fff6e0;
+  --color-processing: #c25a0b;
+  --color-processing-bg: #fff2e2;
+  --color-done: #6b4fa8;
+  --color-done-bg: #f1eafb;
+  --color-cancel: #7a7288;
+  --color-cancel-bg: #f1f0f3;
+
+  --color-paid: #2e9e5b;
+  --color-debt: #c25a0b;
+  --color-unpaid: #d64545;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+}
