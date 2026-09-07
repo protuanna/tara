@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { beginRefetch, endRefetch } from "@/lib/refetch-indicator";
 
 type ApiSuccess<T> = { data: T };
 type ApiFailure = { error: string; message: string; statusCode: number };
@@ -18,6 +19,8 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   // Installed home-screen apps (iOS PWAs especially) get suspended and
   // resumed rather than reloaded when the user switches away and back —
@@ -46,6 +49,11 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
       return;
     }
     let cancelled = false;
+    // A revalidation (data already on screen from a prior load) gets a
+    // visible top-bar cue via ResumeLoadingBar; the very first load already
+    // has its own skeleton, so it doesn't need one too.
+    const isRevalidation = dataRef.current !== null;
+    if (isRevalidation) beginRefetch();
     setLoading(true);
     setError(null);
     fetch(url)
@@ -60,6 +68,7 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+        if (isRevalidation) endRefetch();
       });
     return () => {
       cancelled = true;
