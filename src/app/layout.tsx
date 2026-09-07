@@ -39,8 +39,8 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <CartProvider>
-          <div className="relative mx-auto flex h-dvh max-w-[480px] flex-col overflow-hidden bg-surface shadow-xl">
-            <ResumeToast />
+          <ResumeToast />
+          <div className="mx-auto flex h-dvh max-w-[480px] flex-col overflow-hidden bg-surface shadow-xl">
             <SiteHeader />
             <div className="flex-1 overflow-y-auto">{children}</div>
             <BottomNav />

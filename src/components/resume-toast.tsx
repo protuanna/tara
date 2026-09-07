@@ -46,7 +46,12 @@ export function ResumeToast() {
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-center px-4">
+    // `fixed` to the viewport, not `absolute` inside the shell — same
+    // reason <Sheet> does this (see sheet.tsx): a sticky/scrolling
+    // descendant elsewhere in the tree (e.g. /orders' sticky filter bar)
+    // can end up compositing above an `absolute` sibling on iOS Safari,
+    // which is exactly why this toast was invisible on some pages.
+    <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4">
       <div className="flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-white shadow-lg">
         {done ? (
           <>
