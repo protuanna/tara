@@ -103,12 +103,17 @@ export default function PushTestPage() {
     setLog(null);
     setBusy(true);
     try {
-      const result = await apiMutate<{ sent: number; removed: number }>("/api/push/send", "POST", {
-        title,
-        body,
-      });
+      const result = await apiMutate<{ sent: number; removed: number; pushError: string | null }>(
+        "/api/push/send",
+        "POST",
+        { title, body },
+      );
       if ("error" in result) throw new Error(result.error);
-      setLog(`Đã gửi tới ${result.data.sent} thiết bị (loại bỏ ${result.data.removed} subscription hết hạn).`);
+      const { sent, removed, pushError } = result.data;
+      setLog(
+        `Đã lưu vào danh sách thông báo. Gửi push tới ${sent} thiết bị (loại bỏ ${removed} subscription hết hạn).` +
+          (pushError ? ` Lỗi gửi push: ${pushError}` : ""),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gửi thất bại");
     } finally {
