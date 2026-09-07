@@ -161,7 +161,7 @@ function ProductsScreen({
       )}
 
       {categories.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="no-scrollbar flex gap-2 overflow-x-auto">
           <button
             onClick={() => setSelectedTab(null)}
             className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${

@@ -65,7 +65,7 @@ function SaleScreen({ categories, products }: { categories: CategoryDTO[]; produ
 
   return (
     <div className="flex flex-col">
-      <div className="flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
         <button
           onClick={() => setSelectedCategoryId(undefined)}
           className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
@@ -233,7 +233,7 @@ function SaleScreen({ categories, products }: { categories: CategoryDTO[]; produ
 function SaleSkeleton() {
   return (
     <div className="flex flex-col">
-      <div className="flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-9 w-24 flex-none rounded-full" />
         ))}
