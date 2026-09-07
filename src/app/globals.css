@@ -47,16 +47,3 @@ textarea,
 select {
   font-size: 16px;
 }
-
-/* Thin top progress bar shown while useApiGet silently revalidates
-   (background refetch on app resume, or after a mutation's refetch()) —
-   see ResumeLoadingBar. Sweeps left-to-right on loop, no fixed end point
-   since we don't track real progress, just "something is loading". */
-@keyframes resume-loading-sweep {
-  0% {
-    left: -35%;
-  }
-  100% {
-    left: 100%;
-  }
-}

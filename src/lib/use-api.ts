@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { beginRefetch, endRefetch } from "@/lib/refetch-indicator";
+import { beginRefetch, endRefetch, announceResume } from "@/lib/refetch-indicator";
 
 type ApiSuccess<T> = { data: T };
 type ApiFailure = { error: string; message: string; statusCode: number };
@@ -33,7 +33,10 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
   // `loading` alone.
   useEffect(() => {
     function handleResume() {
-      if (document.visibilityState === "visible") setReloadKey((k) => k + 1);
+      if (document.visibilityState === "visible") {
+        announceResume();
+        setReloadKey((k) => k + 1);
+      }
     }
     document.addEventListener("visibilitychange", handleResume);
     window.addEventListener("pageshow", handleResume);
@@ -49,9 +52,10 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
       return;
     }
     let cancelled = false;
-    // A revalidation (data already on screen from a prior load) gets a
-    // visible top-bar cue via ResumeLoadingBar; the very first load already
-    // has its own skeleton, so it doesn't need one too.
+    // A revalidation (data already on screen from a prior load) feeds the
+    // activeCount that <ResumeToast> watches to know when a resume-
+    // triggered refetch has finished; the very first load already has its
+    // own skeleton, so it's not counted here.
     const isRevalidation = dataRef.current !== null;
     if (isRevalidation) beginRefetch();
     setLoading(true);
