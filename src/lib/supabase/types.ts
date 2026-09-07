@@ -146,6 +146,24 @@ export interface Database {
           },
         ];
       };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["push_subscriptions"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       customer_debts: {
