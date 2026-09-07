@@ -85,6 +85,13 @@ export default function HomePage() {
           );
         })}
       </div>
+
+      {/* Temporary: standalone home-screen mode has no address bar, so this
+          is the only way to reach /push-test from inside the installed app
+          while trying out Web Push. Remove once the trial is done. */}
+      <Link href="/push-test" className="pt-2 text-center text-xs text-muted underline">
+        [Test] Thử thông báo đẩy
+      </Link>
     </div>
   );
 }
