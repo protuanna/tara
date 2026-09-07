@@ -1,46 +1,34 @@
+"use client";
+
+import { use } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
 import { formatOrderTime } from "@/lib/date";
 import { FULFILLMENT_LABEL, PAYMENT_LABEL } from "@/lib/order-labels";
 import { OrderStatusActions } from "@/components/order-status-actions";
-import type { FulfillmentStatus, PaymentStatus } from "@/lib/supabase/types";
+import { Skeleton } from "@/components/skeleton";
+import type { OrderDetailDTO } from "@/lib/services/ordersService";
 
-export const dynamic = "force-dynamic";
+export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { data: order, loading, error, refetch } = useApiGet<OrderDetailDTO>(`/api/orders/${id}`);
 
-type OrderDetailRow = {
-  id: string;
-  created_at: string;
-  subtotal: number;
-  fee: number;
-  discount_amount: number;
-  total: number;
-  fulfillment_status: FulfillmentStatus;
-  payment_status: PaymentStatus;
-  customer_id: string;
-  customers: { name: string } | null;
-  order_items: { id: string; name: string; price: number; qty: number }[];
-};
+  // Gate on `!order`, not `loading` — refetch() (after cancel/deliver) flips
+  // loading back to true while the old order is still valid; re-showing the
+  // skeleton would unmount the action sheet mid-interaction.
+  if (loading && !order) return <OrderDetailSkeleton />;
 
-export default async function OrderDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const supabase = await createClient();
-
-  const { data: order } = await supabase
-    .from("orders")
-    .select(
-      "id, created_at, subtotal, fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, name, price, qty)",
-    )
-    .eq("id", id)
-    .returns<OrderDetailRow[]>()
-    .maybeSingle();
-
-  if (!order) notFound();
+  if (error || !order) {
+    return (
+      <div className="flex flex-col items-center gap-3 px-6 pt-16 text-center">
+        <div className="text-base font-bold">Không tìm thấy đơn hàng</div>
+        <Link href="/orders" className="text-sm font-semibold text-primary-dark">
+          Về danh sách đơn hàng
+        </Link>
+      </div>
+    );
+  }
 
   const fulfillment = FULFILLMENT_LABEL[order.fulfillment_status];
   const payment = PAYMENT_LABEL[order.payment_status];
@@ -122,16 +110,25 @@ export default async function OrderDetailPage({
       </div>
 
       {canDeliver ? (
-        <OrderStatusActions
-          orderId={order.id}
-          customerId={order.customer_id}
-          variant="page"
-        />
+        <OrderStatusActions orderId={order.id} onChanged={refetch} variant="page" />
       ) : order.fulfillment_status === "done" ? (
         <div className="rounded-2xl bg-primary-tint p-3.5 text-center text-[13px] font-semibold text-primary-dark">
           Đơn đã giao xong
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function OrderDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 px-4 pb-6 pt-3">
+      <div className="flex items-center gap-2.5">
+        <Skeleton className="size-[34px] rounded-[11px]" />
+        <Skeleton className="h-5 w-28 rounded" />
+      </div>
+      <Skeleton className="h-[280px] rounded-2xl" />
+      <Skeleton className="h-[54px] rounded-2xl" />
     </div>
   );
 }

@@ -1,0 +1,7 @@
+export { categoriesService } from "./categoriesService";
+export { productsService } from "./productsService";
+export { customersService } from "./customersService";
+export { ordersService } from "./ordersService";
+export { debtService } from "./debtService";
+export { homeService } from "./homeService";
+export { reportService } from "./reportService";

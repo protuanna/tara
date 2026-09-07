@@ -1,79 +1,39 @@
+"use client";
+
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
-import { formatOrderTime, vnTodayStartIso } from "@/lib/date";
+import { formatOrderTime } from "@/lib/date";
 import { QuickAction } from "@/components/quick-action";
 import { CartIcon, ReceiptIcon, BoxIcon, PeopleIcon } from "@/components/icons";
-import type { PaymentStatus } from "@/lib/supabase/types";
+import { Skeleton } from "@/components/skeleton";
+import type { DashboardDTO } from "@/lib/services/homeService";
 
-// Dashboard numbers must reflect live data, not a static build-time snapshot.
-export const dynamic = "force-dynamic";
+export default function HomePage() {
+  const { data, loading, error } = useApiGet<DashboardDTO>("/api/home");
 
-type RecentOrderRow = {
-  id: string;
-  created_at: string;
-  total: number;
-  customers: { name: string } | null;
-  order_items: { qty: number }[];
-};
-
-type TodayOrderRow = {
-  total: number;
-  payment_status: PaymentStatus;
-};
-
-export default async function HomePage() {
-  const supabase = await createClient();
-  const todayStart = vnTodayStartIso();
-
-  const [recentOrdersRes, todayOrdersRes, debtsRes] = await Promise.all([
-    supabase
-      .from("orders")
-      .select("id, created_at, total, customers(name), order_items(qty)")
-      .order("created_at", { ascending: false })
-      .limit(3)
-      .returns<RecentOrderRow[]>(),
-    supabase
-      .from("orders")
-      .select("total, payment_status")
-      .gte("created_at", todayStart)
-      .neq("fulfillment_status", "cancel")
-      .returns<TodayOrderRow[]>(),
-    supabase.from("customer_debts").select("debt").gt("debt", 0),
-  ]);
-
-  const recentOrders = recentOrdersRes.data ?? [];
-  const todayOrders = todayOrdersRes.data ?? [];
-  const debts = debtsRes.data ?? [];
-
-  const todayOrdersCount = todayOrders.length;
-  // Matches the design's revenue rule (fulfillment not cancelled, payment
-  // not unpaid) — see docs/design/tara-shop-prototype-logic.js — scoped to
-  // today, since that's what the card actually labels itself as.
-  const todayRevenue = todayOrders
-    .filter((o) => o.payment_status !== "unpaid")
-    .reduce((sum, o) => sum + o.total, 0);
-
-  const debtorCount = debts.length;
-  const totalDebt = debts.reduce((sum, d) => sum + (d.debt ?? 0), 0);
+  if (loading) return <HomeSkeleton />;
+  if (error || !data) {
+    return <p className="p-4 text-center text-sm text-unpaid">{error ?? "Không tải được dữ liệu"}</p>;
+  }
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-3">
       <div className="flex flex-col gap-1.5 rounded-[18px] bg-gradient-to-br from-primary to-primary-dark p-5 text-white">
         <div className="text-sm font-bold opacity-95">Tara&apos;Shop</div>
         <div className="text-[13px] opacity-85">Doanh thu hôm nay</div>
-        <div className="text-3xl font-extrabold">{formatVnd(todayRevenue)}</div>
-        <div className="text-[13px] opacity-85">{todayOrdersCount} đơn đã bán</div>
+        <div className="text-3xl font-extrabold">{formatVnd(data.todayRevenue)}</div>
+        <div className="text-[13px] opacity-85">{data.todayOrdersCount} đơn đã bán</div>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
         <div className="flex flex-col gap-1 rounded-[14px] border border-line bg-white p-3.5">
           <div className="text-xs text-muted">Khách còn nợ</div>
-          <div className="text-xl font-bold">{debtorCount}</div>
+          <div className="text-xl font-bold">{data.debtorCount}</div>
         </div>
         <div className="flex flex-col gap-1 rounded-[14px] border border-line bg-white p-3.5">
           <div className="text-xs text-muted">Tổng phải thu</div>
-          <div className="text-xl font-bold text-unpaid">{formatVnd(totalDebt)}</div>
+          <div className="text-xl font-bold text-unpaid">{formatVnd(data.totalDebt)}</div>
         </div>
       </div>
 
@@ -100,12 +60,12 @@ export default async function HomePage() {
       </div>
 
       <div className="flex flex-col gap-2">
-        {recentOrders.length === 0 && (
+        {data.recentOrders.length === 0 && (
           <div className="rounded-xl border border-line bg-white p-4 text-center text-sm text-muted">
             Chưa có đơn hàng nào.
           </div>
         )}
-        {recentOrders.map((order) => {
+        {data.recentOrders.map((order) => {
           const itemCount = order.order_items.reduce((sum, i) => sum + i.qty, 0);
           return (
             <div
@@ -124,6 +84,32 @@ export default async function HomePage() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 px-4 pb-6 pt-3">
+      <Skeleton className="h-[124px] rounded-[18px]" />
+      <div className="grid grid-cols-2 gap-2.5">
+        <Skeleton className="h-[64px] rounded-[14px]" />
+        <Skeleton className="h-[64px] rounded-[14px]" />
+      </div>
+      <div className="grid grid-cols-4 gap-1.5 rounded-[18px] border border-line bg-white px-2 py-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="flex flex-col items-center gap-1.5">
+            <Skeleton className="size-[46px] rounded-[15px]" />
+            <Skeleton className="h-3 w-10 rounded" />
+          </div>
+        ))}
+      </div>
+      <Skeleton className="h-4 w-28" />
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 3 }, (_, i) => (
+          <Skeleton key={i} className="h-[54px] rounded-xl" />
+        ))}
       </div>
     </div>
   );

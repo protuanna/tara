@@ -26,11 +26,68 @@ every screen above was verified by hand against a live Supabase project
 just "it builds." Do the same when changing business logic: a type-check
 passing doesn't mean the query/filter/calculation is actually correct.
 
-Follow the existing patterns for any further work (new field, new screen
-variant, etc.): Server Component fetch via `src/lib/supabase/server.ts`,
-`"use server"` actions for writes, filters as URL search params rather than
-client-only state, shared logic pulled into `src/lib/` instead of
-duplicated per screen.
+**Data flow: every screen is a Client Component that calls an API route.**
+This was a deliberate rewrite (mirroring the structure of a prior project,
+`bizmail-client-next`) away from an earlier version where pages were Server
+Components querying Supabase directly during SSR. The current shape:
+
+- `src/lib/services/*.ts` — the actual Supabase queries/business logic, one
+  file per resource (`ordersService`, `productsService`, etc.), exported via
+  `src/lib/services/index.ts`. This is the only layer allowed to import
+  `src/lib/supabase/server.ts`.
+- `src/app/api/**/route.ts` — thin HTTP handlers: parse the request, call a
+  service method, return `NextResponse.json({ data })` on success or use
+  `badRequest()` / `notFound()` / `handleRouteError()` from `src/lib/api.ts`
+  on failure. Collection routes (`/api/orders`) hold GET (list) + POST
+  (create); `[id]/route.ts` holds single-resource GET/DELETE; state-changing
+  sub-actions get their own nested route (`/api/orders/[id]/cancel`,
+  `/api/orders/[id]/deliver`, `/api/customers/[id]/collect-debt`) rather than
+  overloading a generic PATCH — mirrors bizmail's `campaign/[id]/pause`
+  convention. Every JSON response is `{ data: T }` or `{ error, message,
+  statusCode }` — never a bare array/object — client code depends on that
+  shape.
+- `src/lib/use-api.ts` — `useApiGet<T>(url)` (fetch + loading/error state,
+  `refetch()` to force a reload) and `apiMutate<T>(url, method, body)` for
+  POST/DELETE, both client-side. Pages call these instead of doing
+  `fetch()`/`useEffect` inline — there is no React Query despite it not
+  being installed (bizmail-client-next has it as a dependency too but
+  doesn't actually use it anywhere; plain fetch+state is the real pattern
+  there and here).
+- No Server Actions anywhere in this app anymore — every write goes through
+  a POST/DELETE route + `apiMutate`, not a `"use server"` function.
+
+**Gotcha that actually bit us, verified by hand, not just reasoned about:**
+gate a page's loading skeleton on `!data` (or `!order`, etc.), **never** on
+the hook's `loading` flag alone. `refetch()` sets `loading` back to `true`
+while the previous `data` is still sitting there — a page that does `if
+(loading) return <Skeleton />` will unmount its whole content tree (closing
+any open `<Sheet>`, losing local state) every single time a mutation
+completes and calls `refetch()`. Confirmed with Playwright: clicking "Lưu
+danh mục" inside a `<Sheet>` on `/products` re-triggered the categories
+fetch, which under the old `if (loading)` gate flashed the screen back to
+its skeleton mid-interaction. Every screen here now gates on the data
+itself; keep that pattern for anything new.
+
+Follow the existing patterns for any further work (new field, new screen,
+etc.): add a service method → add/extend a route → call it via `useApiGet`/
+`apiMutate` from a Client Component. Filters still live in URL search
+params (`useSearchParams()` + `<Link>`, wrapped in `<Suspense>` — Next
+requires that for any component calling `useSearchParams()`), not client
+state — see `/orders` and `/report`.
+
+This rewrite was verified against a real running dev server + Playwright
+(the `webapp-testing` skill), not just build/lint — clicked through
+Sale→Checkout→Save→Order-detail in a real headless browser and confirmed
+every screen's network requests actually hit `/api/*`. Two things worth
+knowing if you do this again: (1) in this sandboxed environment, Playwright
+needs the Bash tool's sandbox disabled to reach `localhost` at all (plain
+`curl` works fine without it — only the browser subprocess's own networking
+is affected); (2) a broad/ambiguous Playwright selector (e.g. "click the
+first button matching 'Xóa'") can and did delete a real seed product
+instead of the intended test one — when scripting destructive UI actions
+against real Supabase data, scope selectors precisely (by row/container,
+not just visible text) or point mutations at data you created in that same
+script run and can identify by id.
 
 ## Commands
 
@@ -89,6 +146,31 @@ lifecycle rules (e.g. which combination of fulfillment+payment status counts
 toward revenue, when a customer's debt is incremented) are easy to get
 subtly wrong without them.
 
+## Branding
+
+App icon / favicon / share-image / "Add to Home Screen" assets are all
+generated from `docs/design/brand/tara-logo-1024.png` (a red-gradient
+"TARA" wordmark + coffee-leaf mark — a different, newer brand asset than
+the purple UI palette in `globals.css`/`docs/design/tara-shop-prototype-notes.md`;
+the in-app color scheme hasn't been updated to match, only the
+icon/favicon/manifest/OG-image layer has). Regenerate with `sips` (no other
+image tooling is installed) if the source logo changes:
+
+- `src/app/icon.png` (512×512) and `src/app/apple-icon.png` (180×180) —
+  Next's Metadata File Conventions auto-detect these, no manual `<link>`
+  tags needed.
+- `src/app/favicon.ico` (48×48) — legacy fallback.
+- `src/app/opengraph-image.png` (1200×630) — square logo centered on a
+  `#BD4D41` padded background (sampled from the logo's own average color);
+  auto-detected the same way for link-preview `og:image`.
+- `public/icons/icon-{192,512}.png` — referenced by `src/app/manifest.ts`
+  (the PWA manifest; `theme_color`/icons here use the new red brand, while
+  `background_color` matches the app's actual purple-theme page background
+  so the splash screen doesn't jar against the real UI underneath it).
+- `metadataBase` in `layout.tsx` falls back to `http://localhost:3000` via
+  `NEXT_PUBLIC_SITE_URL` — set that env var (in Vercel too) once the real
+  domain is known, or share links will resolve `og:image` to localhost.
+
 ## Architecture
 
 - `src/lib/supabase/types.ts` is a **hand-written** `Database` type mirrored
@@ -108,45 +190,48 @@ subtly wrong without them.
   derives each customer's debt by summing `orders.total` where
   `payment_status = 'debt'`. "Collecting" a debt means flipping those
   orders' `payment_status` to `'paid'` — implemented in
-  `src/app/debt/actions.ts`'s `collectDebt()` — not decrementing a counter.
+  `customersService.collectDebt()`, called from
+  `POST /api/customers/[id]/collect-debt` — not decrementing a counter.
 - A walk-in customer ("Khách lẻ") is a real row in `customers`
   (`WALKIN_CUSTOMER_ID` in `types.ts`), not a null `customer_id`, so every
   order always has a customer to join against.
 - A newly-saved order gets `fulfillment_status: "processing"` directly, not
   the `"pending"` column default — that's what the design prototype's
-  `saveOrder()` does, so `src/app/checkout/actions.ts`'s `createOrder` sets
-  it explicitly. Don't rely on the DB default for this column.
+  `saveOrder()` does, so `ordersService.create()` sets it explicitly. Don't
+  rely on the DB default for this column.
 - The cart (`src/lib/cart-context.tsx`, `CartProvider`) is **in-memory React
   state only**, mounted once in the root layout so it survives client-side
   navigation between `/sale` and `/checkout` — but a hard refresh loses it.
   If that becomes a real problem, persist it (localStorage or a
   `draft_orders` table) rather than reaching for a state library; don't
   duplicate cart logic per-screen.
-- Order creation (`src/app/checkout/actions.ts`) recomputes totals
-  server-side via `calcTotals()` from the raw cart/fee/discount — never
-  trust a client-submitted total. It's also **not transactional**: it
-  inserts the order then its `order_items`, and best-effort deletes the
-  order if the items insert fails, rather than using a real DB transaction
-  (supabase-js has no multi-statement transaction API). A `create_order`
-  Postgres RPC would fix that properly if it ever matters.
-- Order lifecycle mutations (`src/app/orders/actions.ts`: `cancelOrder`,
-  `deliverOrder`) and their confirm sheets are one shared component,
-  `<OrderStatusActions orderId customerId variant="row"|"page">`
+- `ordersService.create()` recomputes totals server-side via `calcTotals()`
+  from the raw cart/fee/discount — never trust a client-submitted total.
+  It's also **not transactional**: it inserts the order then its
+  `order_items`, and best-effort deletes the order if the items insert
+  fails, rather than using a real DB transaction (supabase-js has no
+  multi-statement transaction API). A `create_order` Postgres RPC would fix
+  that properly if it ever matters.
+- Order lifecycle mutations (`ordersService.cancel()` /
+  `ordersService.deliver()`, exposed as `POST /api/orders/[id]/cancel` and
+  `POST /api/orders/[id]/deliver`) and their confirm sheets are one shared
+  component, `<OrderStatusActions orderId onChanged variant="row"|"page">`
   (`src/components/order-status-actions.tsx`), used on both the `/orders`
   list rows and the `/orders/[id]` detail page — don't reimplement
-  cancel/deliver UI a third time, extend that component. `deliverOrder`
-  decides paid vs. debt vs. unpaid from `customerId === WALKIN_CUSTOMER_ID`;
-  it doesn't touch `customer_debts` directly (that view derives from
-  `payment_status`, see below). Every mutation calls `router.refresh()`
-  afterward to re-pull the Server Component data — there's no client-side
-  cache/store of orders to update manually.
-- `/orders` reads its filters (`status`/`time`/`pay`) from **URL search
-  params**, not client state — `OrdersScreen` is handed the parsed values as
-  props and every filter chip/tab is a plain `<Link>` to a new query string
-  (see `ordersUrl()` in `orders-screen.tsx`). This keeps filtering
-  server-rendered/shareable and avoids a client fetch layer; follow the same
-  pattern for `/report`'s period filter rather than introducing client-side
-  fetching.
+  cancel/deliver UI a third time, extend that component. `deliver()` looks
+  the order's `customer_id` up server-side itself (not trusted from the
+  client) to decide paid vs. debt vs. unpaid; it doesn't touch
+  `customer_debts` directly (that view derives from `payment_status`, see
+  below). `onChanged` is the caller's `refetch` — always pass one, and see
+  the loading-gate gotcha above for why the receiving page must not gate its
+  skeleton on raw `loading`.
+- `/orders` and `/report` read their filters (`status`/`time`/`pay`,
+  `period`) from **URL search params** via `useSearchParams()` (wrapped in
+  `<Suspense>`), not client state — every filter chip/tab is a plain
+  `<Link>` to a new query string (see `ordersUrl()` in `orders/page.tsx`).
+  This keeps filtering shareable/bookmarkable; the page still re-fetches via
+  `useApiGet` when the URL changes, it just doesn't hold the filter values
+  in local state.
 - Status/payment label + color maps (`FULFILLMENT_LABEL`, `PAYMENT_LABEL`,
   `PAYMENT_METHOD_LABEL`) live in `src/lib/order-labels.ts` — shared by the
   order detail page and the orders list. Add to that file rather than
@@ -163,9 +248,11 @@ subtly wrong without them.
   SET NULL`, so the schema tolerates it, but the only way to remove a
   category today is directly in the DB. `ProductsScreen` already renders an
   "Chưa phân loại" (uncategorized) group defensively for that case.
-- `createCustomer` (`src/app/checkout/actions.ts`) and `collectDebt`
-  (`src/app/debt/actions.ts`) are reused as-is by `/customers` — don't
-  duplicate "add a customer" or "mark debt collected" logic there. One
+- `POST /api/customers` (used by both `/checkout`'s inline "add customer"
+  and `/customers`) and `POST /api/customers/[id]/collect-debt` (used by
+  both `/customers` and `/debt`) are the same endpoints called from
+  multiple screens — don't duplicate "add a customer" or "mark debt
+  collected" logic client-side, just call the existing route. One
   deliberate deviation from the prototype: it reuses the *same* debt-only
   sheet for every customer row regardless of whether they owe anything;
   `/customers`' detail sheet always shows order-count/total-spent stats and
@@ -178,21 +265,43 @@ subtly wrong without them.
   "unpaid"`) here; they're different metrics on purpose.
 - `/report`'s daily bar chart and its period-scoped numbers (revenue, order
   count, top products, payment donut) are **two independent windows**, both
-  computed in `src/app/report/page.tsx`: the bars always cover the last 7
+  computed in `reportService.getReport()`: the bars always cover the last 7
   VN-calendar-days (10 for the `30d` period), regardless of which period tab
   is active, while everything else uses the selected period's cutoff
   (`today`/`7d`/`30d`). This matches the design, not a bug — don't try to
   make the bars "agree" with the period tab. Both windows apply the same
   revenue-counting rule as Home (`fulfillment_status != "cancel" &&
-  payment_status != "unpaid"`), filtered at the query level this time rather
-  than in JS. `vnDateKey()` (`src/lib/date.ts`) is what buckets rows into VN
-  calendar days for the bars — reuse it for any other daily-grouping report.
+  payment_status != "unpaid"`), filtered at the query level. `vnDateKey()`
+  (`src/lib/date.ts`) is what buckets rows into VN calendar days for the
+  bars — reuse it for any other daily-grouping report. The donut's
+  SVG stroke-dasharray/offset math is recomputed client-side in
+  `report/page.tsx` from the plain `{ method, pct }` data the API returns —
+  the API itself doesn't know about SVG geometry.
 - Bottom-sheet overlays (`src/components/sheet.tsx`, `<Sheet>`) use
   `position: fixed` + a `max-w-[480px]` inner panel, not `absolute` inside
   the shell — the shell's content area is `overflow-y-auto`, which clips
   `absolute` descendants to itself (hiding the header/bottom nav instead of
   covering them). Reuse `<Sheet>` for any new picker/confirm sheet rather
   than reimplementing the overlay.
+- A `<Sheet>` rendered inside a `<Link>` (e.g. the cancel/deliver confirm
+  sheets in `<OrderStatusActions>`, nested inside each `/orders` row's
+  `<Link>`) needs `e.preventDefault()` on top of the panel's existing
+  `e.stopPropagation()`, or clicking a button inside it falls through to a
+  full-page navigation to the row's href. Why both are required: Next's
+  `<Link>` only skips its own navigation when its own click handler sees
+  `event.defaultPrevented`; `stopPropagation()` alone stops the click from
+  ever reaching that handler, so `<Link>`'s own `preventDefault()` never
+  runs and the browser falls back to the native `<a href>` action — worse
+  than the soft-nav bug it was meant to prevent. Any ancestor wrapper (see
+  `order-status-actions.tsx`) needs the same `preventDefault()`-not-
+  `stopPropagation()` treatment for the same reason.
+- Every `<input>`/`<textarea>`/`<select>` must render at `>= 16px` font-size
+  (Tailwind `text-base` or larger) — iOS Safari auto-zooms the whole page on
+  focus for any smaller computed font-size, forcing the user to manually
+  pinch-zoom back out. `globals.css` has an unlayered
+  `input, textarea, select { font-size: 16px; }` safety net (deliberately
+  outside `@layer` so it beats any Tailwind text-size utility), but don't
+  rely on it alone for new inputs — set `text-base` explicitly too.
 - RLS is enabled on every table but every policy is `using (true) with check
   (true)` for `anon`/`authenticated` (migration `0002`) — i.e. wide open,
   because there's no per-user auth (see "no auth/login" above). This is a

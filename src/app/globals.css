@@ -34,3 +34,16 @@ body {
   background: var(--color-page);
   color: var(--color-ink);
 }
+
+/*
+ * iOS Safari (and some Android browsers) auto-zoom the page on focusing any
+ * form field with a computed font-size under 16px. Deliberately unlayered
+ * (not @layer base) so it wins over any Tailwind text-size utility per the
+ * CSS cascade-layers spec — a safety net for future inputs, on top of every
+ * current one already using text-base.
+ */
+input,
+textarea,
+select {
+  font-size: 16px;
+}

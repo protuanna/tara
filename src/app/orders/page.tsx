@@ -1,95 +1,256 @@
-import { createClient } from "@/lib/supabase/server";
-import { vnTodayStartIso, daysAgoIso } from "@/lib/date";
-import { OrdersScreen } from "./orders-screen";
-import type { FulfillmentStatus, PaymentStatus, PaymentMethod } from "@/lib/supabase/types";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useApiGet } from "@/lib/use-api";
+import { formatVnd } from "@/lib/format";
+import { formatOrderTime } from "@/lib/date";
+import { FULFILLMENT_LABEL, PAYMENT_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/order-labels";
+import { Sheet } from "@/components/sheet";
+import { Skeleton } from "@/components/skeleton";
+import { OrderStatusActions } from "@/components/order-status-actions";
+import type {
+  OrderListRow,
+  StatusCounts,
+  StatusFilter,
+  TimeFilter,
+  PayFilter,
+} from "@/lib/services/ordersService";
 
-export type StatusFilter = "all" | FulfillmentStatus;
-export type TimeFilter = "all" | "today" | "7d" | "30d";
-export type PayFilter = "all" | PaymentStatus;
+const STATUS_TABS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "Tất cả" },
+  { value: "pending", label: "Chờ xác nhận" },
+  { value: "processing", label: "Đang xử lý" },
+  { value: "done", label: "Đã giao" },
+  { value: "cancel", label: "Đã hủy" },
+];
 
-const STATUS_VALUES: FulfillmentStatus[] = ["pending", "processing", "done", "cancel"];
-const PAY_VALUES: PaymentStatus[] = ["paid", "debt", "unpaid"];
-const TIME_VALUES: TimeFilter[] = ["today", "7d", "30d"];
+const TIME_CHIPS: { value: TimeFilter; label: string }[] = [
+  { value: "all", label: "Tất cả thời gian" },
+  { value: "today", label: "Hôm nay" },
+  { value: "7d", label: "7 ngày" },
+  { value: "30d", label: "30 ngày" },
+];
 
-function parseStatus(v: string | undefined): StatusFilter {
-  return v && STATUS_VALUES.includes(v as FulfillmentStatus) ? (v as FulfillmentStatus) : "all";
+const PAY_CHIPS: { value: PayFilter; label: string }[] = [
+  { value: "all", label: "Mọi thanh toán" },
+  { value: "paid", label: "Đã thanh toán" },
+  { value: "unpaid", label: "Chưa thanh toán" },
+  { value: "debt", label: "Đã ghi nợ" },
+];
+
+function ordersUrl(next: { status: StatusFilter; time: TimeFilter; pay: PayFilter }): string {
+  const params = new URLSearchParams();
+  if (next.status !== "all") params.set("status", next.status);
+  if (next.time !== "all") params.set("time", next.time);
+  if (next.pay !== "all") params.set("pay", next.pay);
+  const qs = params.toString();
+  return qs ? `/orders?${qs}` : "/orders";
 }
-function parseTime(v: string | undefined): TimeFilter {
-  return v && TIME_VALUES.includes(v as TimeFilter) ? (v as TimeFilter) : "all";
+
+// useSearchParams() opts the subtree into client-only rendering, which
+// Next.js requires wrapping in Suspense so the rest of the route can still
+// have a static shell.
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<OrdersSkeleton />}>
+      <OrdersContent />
+    </Suspense>
+  );
 }
-function parsePay(v: string | undefined): PayFilter {
-  return v && PAY_VALUES.includes(v as PaymentStatus) ? (v as PaymentStatus) : "all";
-}
 
-export type OrderRow = {
-  id: string;
-  created_at: string;
-  total: number;
-  fulfillment_status: FulfillmentStatus;
-  payment_status: PaymentStatus;
-  payment_method: PaymentMethod;
-  customer_id: string;
-  customers: { name: string } | null;
-  order_items: { qty: number }[];
-};
+function OrdersContent() {
+  const searchParams = useSearchParams();
+  const activeStatus = (searchParams.get("status") as StatusFilter) || "all";
+  const activeTime = (searchParams.get("time") as TimeFilter) || "all";
+  const activePay = (searchParams.get("pay") as PayFilter) || "all";
 
-export type StatusCounts = Record<StatusFilter, number>;
+  const apiUrl = `/api/orders?${new URLSearchParams({
+    ...(activeStatus !== "all" ? { status: activeStatus } : {}),
+    ...(activeTime !== "all" ? { time: activeTime } : {}),
+    ...(activePay !== "all" ? { pay: activePay } : {}),
+  }).toString()}`;
 
-export default async function OrdersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; time?: string; pay?: string }>;
-}) {
-  const sp = await searchParams;
-  const status = parseStatus(sp.status);
-  const time = parseTime(sp.time);
-  const pay = parsePay(sp.pay);
+  const { data, refetch } = useApiGet<{ orders: OrderListRow[]; statusCounts: StatusCounts }>(
+    apiUrl,
+  );
 
-  const supabase = await createClient();
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  let query = supabase
-    .from("orders")
-    .select(
-      "id, created_at, total, fulfillment_status, payment_status, payment_method, customer_id, customers(name), order_items(qty)",
-    )
-    .order("created_at", { ascending: false });
+  // Gate on `!data` alone, not `loading` — refetch() (after cancel/deliver)
+  // flips loading back to true while old data is still valid, and we don't
+  // want the whole list to flash back to a skeleton (unmounting any open
+  // sheet) every time a mutation completes.
+  if (!data) return <OrdersSkeleton />;
 
-  if (status !== "all") query = query.eq("fulfillment_status", status);
-  if (pay !== "all") query = query.eq("payment_status", pay);
-  if (time === "today") query = query.gte("created_at", vnTodayStartIso());
-  else if (time === "7d") query = query.gte("created_at", daysAgoIso(7));
-  else if (time === "30d") query = query.gte("created_at", daysAgoIso(30));
-
-  const [{ data: orders }, { data: allStatuses }] = await Promise.all([
-    query.returns<OrderRow[]>(),
-    supabase
-      .from("orders")
-      .select("fulfillment_status")
-      .returns<{ fulfillment_status: FulfillmentStatus }[]>(),
-  ]);
-
-  // Counts are always across ALL orders (unfiltered by time/pay), just by
-  // fulfillment status — matches the design's tab-count behavior.
-  const statusCounts: StatusCounts = {
-    all: allStatuses?.length ?? 0,
-    pending: 0,
-    processing: 0,
-    done: 0,
-    cancel: 0,
-  };
-  for (const row of allStatuses ?? []) {
-    statusCounts[row.fulfillment_status] += 1;
-  }
+  const { orders, statusCounts } = data;
+  const activeFilterCount = (activeTime !== "all" ? 1 : 0) + (activePay !== "all" ? 1 : 0);
 
   return (
-    <OrdersScreen
-      orders={orders ?? []}
-      statusCounts={statusCounts}
-      activeStatus={status}
-      activeTime={time}
-      activePay={pay}
-    />
+    <div className="flex flex-col">
+      <div className="sticky top-0 z-[4] flex items-center gap-2.5 border-b border-line bg-white px-4 py-3">
+        <div className="flex flex-1 gap-2 overflow-x-auto">
+          {STATUS_TABS.map((tab) => {
+            const active = tab.value === activeStatus;
+            const label =
+              active && tab.value !== "all"
+                ? `${tab.label} ${statusCounts[tab.value]}`
+                : tab.label;
+            return (
+              <Link
+                key={tab.value}
+                href={ordersUrl({ status: tab.value, time: activeTime, pay: activePay })}
+                className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+                  active ? "bg-primary text-white shadow-md" : "bg-primary-tint text-primary-dark"
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => setFilterOpen(true)}
+          className={`flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-semibold ${
+            activeFilterCount > 0
+              ? "border-primary bg-primary-tint text-primary-dark"
+              : "border-line bg-white text-primary-dark"
+          }`}
+        >
+          Bộ lọc{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2.5 px-4 py-3.5">
+        {orders.length === 0 && (
+          <div className="rounded-xl border border-line bg-white p-8 text-center text-sm text-muted">
+            Không có đơn nào khớp bộ lọc.
+          </div>
+        )}
+
+        {orders.map((order) => {
+          const fulfillment = FULFILLMENT_LABEL[order.fulfillment_status];
+          const payment = PAYMENT_LABEL[order.payment_status];
+          const itemCount = order.order_items.reduce((sum, i) => sum + i.qty, 0);
+          const showActions =
+            order.fulfillment_status === "pending" || order.fulfillment_status === "processing";
+
+          return (
+            <Link
+              key={order.id}
+              href={`/orders/${order.id}`}
+              className="flex flex-col gap-2.5 rounded-2xl border border-line bg-white p-3.5"
+            >
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-sm font-bold">{order.customers?.name ?? "Khách lẻ"}</div>
+                  <div className="text-[11px] text-muted">
+                    {formatOrderTime(order.created_at)} · {itemCount} món ·{" "}
+                    {PAYMENT_METHOD_LABEL[order.payment_method]}
+                  </div>
+                </div>
+                <div
+                  className={`flex-none whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${fulfillment.bg} ${fulfillment.fg}`}
+                >
+                  {fulfillment.label}
+                </div>
+              </div>
+
+              <div className="flex items-baseline justify-between border-t border-primary-tint pt-2.5">
+                <span className={`text-xs font-semibold ${payment.fg}`}>{payment.label}</span>
+                <span className="text-base font-extrabold">{formatVnd(order.total)}</span>
+              </div>
+
+              {showActions && (
+                <OrderStatusActions orderId={order.id} onChanged={refetch} variant="row" />
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      <Sheet open={filterOpen} onClose={() => setFilterOpen(false)}>
+        <div className="flex items-center justify-between">
+          <div className="text-[15px] font-bold">Bộ lọc đơn hàng</div>
+          <button onClick={() => setFilterOpen(false)} className="text-lg font-bold text-muted">
+            ×
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-semibold text-muted">Thời gian</div>
+          <div className="flex flex-wrap gap-2">
+            {TIME_CHIPS.map((chip) => (
+              <Link
+                key={chip.value}
+                href={ordersUrl({ status: activeStatus, time: chip.value, pay: activePay })}
+                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  chip.value === activeTime
+                    ? "border-primary bg-primary-tint text-primary-dark"
+                    : "border-line bg-white text-muted"
+                }`}
+              >
+                {chip.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-semibold text-muted">Trạng thái thanh toán</div>
+          <div className="flex flex-wrap gap-2">
+            {PAY_CHIPS.map((chip) => (
+              <Link
+                key={chip.value}
+                href={ordersUrl({ status: activeStatus, time: activeTime, pay: chip.value })}
+                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  chip.value === activePay
+                    ? "border-primary bg-primary-tint text-primary-dark"
+                    : "border-line bg-white text-muted"
+                }`}
+              >
+                {chip.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-2.5">
+          <Link
+            href={ordersUrl({ status: activeStatus, time: "all", pay: "all" })}
+            className="flex-1 rounded-xl bg-[#F1F0F3] py-3.5 text-center text-sm font-semibold text-ink"
+          >
+            Xóa lọc
+          </Link>
+          <button
+            onClick={() => setFilterOpen(false)}
+            className="flex-[1.4] rounded-xl bg-primary py-3.5 text-sm font-bold text-white"
+          >
+            Áp dụng
+          </button>
+        </div>
+      </Sheet>
+    </div>
+  );
+}
+
+function OrdersSkeleton() {
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-2.5 border-b border-line bg-white px-4 py-3">
+        <div className="flex flex-1 gap-2 overflow-x-auto">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-8 w-20 flex-none rounded-full" />
+          ))}
+        </div>
+        <Skeleton className="h-8 w-16 flex-none rounded-full" />
+      </div>
+      <div className="flex flex-col gap-2.5 px-4 py-3.5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Skeleton key={i} className="h-[92px] rounded-2xl" />
+        ))}
+      </div>
+    </div>
   );
 }
