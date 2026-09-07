@@ -19,6 +19,27 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Installed home-screen apps (iOS PWAs especially) get suspended and
+  // resumed rather than reloaded when the user switches away and back —
+  // the page/JS state just sits there, so without this the last-fetched
+  // data stays on screen indefinitely instead of picking up anything that
+  // changed while the app was in the background. Refetching here is safe
+  // to do quietly: `loading` flips back to true but `data` is untouched
+  // until the new response lands, and every screen already gates its
+  // skeleton on `!data` (see the CLAUDE.md loading-gate note), not on
+  // `loading` alone.
+  useEffect(() => {
+    function handleResume() {
+      if (document.visibilityState === "visible") setReloadKey((k) => k + 1);
+    }
+    document.addEventListener("visibilitychange", handleResume);
+    window.addEventListener("pageshow", handleResume);
+    return () => {
+      document.removeEventListener("visibilitychange", handleResume);
+      window.removeEventListener("pageshow", handleResume);
+    };
+  }, []);
+
   useEffect(() => {
     if (!url) {
       setLoading(false);
