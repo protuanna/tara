@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { calcTotals, type DiscountType } from "@/lib/pricing";
 import { vnTodayStartIso, daysAgoIso } from "@/lib/date";
-import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
 import type { FulfillmentStatus, PaymentStatus, PaymentMethod } from "@/lib/supabase/types";
 
 export type StatusFilter = "all" | FulfillmentStatus;
@@ -47,7 +46,7 @@ export type OrderDetailDTO = {
   payment_status: PaymentStatus;
   customer_id: string;
   customers: { name: string } | null;
-  order_items: { id: string; name: string; price: number; qty: number }[];
+  order_items: { id: string; product_id: string | null; name: string; price: number; qty: number }[];
 };
 
 export const ordersService = {
@@ -95,7 +94,7 @@ export const ordersService = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, created_at, subtotal, fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, name, price, qty)",
+        "id, created_at, subtotal, fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, product_id, name, price, qty)",
       )
       .eq("id", id)
       .returns<OrderDetailDTO[]>()
@@ -164,6 +163,74 @@ export const ordersService = {
     return { data: { id: order.id } };
   },
 
+  /**
+   * "Same shape as checkout but mutates an existing order" (design
+   * prototype's startEdit()/saveEdit()) — only allowed while the order is
+   * still pending/processing (canDeliver), same guard as cancel/deliver.
+   * Replaces order_items wholesale (delete + re-insert) rather than diffing,
+   * same non-transactional caveat as create(): if the items insert fails
+   * after the order row/old items are already gone, the order is left with
+   * no items rather than rolled back.
+   */
+  async update(
+    id: string,
+    input: {
+      customerId: string;
+      items: { productId: string | null; name: string; price: number; qty: number }[];
+      fee: number;
+      discount: number;
+      discountType: DiscountType;
+    },
+  ): Promise<{ data: { id: string } } | { error: string }> {
+    if (input.items.length === 0) return { error: "Giỏ hàng trống" };
+
+    const supabase = await createClient();
+
+    const { data: existing, error: findError } = await supabase
+      .from("orders")
+      .select("fulfillment_status")
+      .eq("id", id)
+      .maybeSingle();
+    if (findError) throw findError;
+    if (!existing) return { error: "Không tìm thấy đơn hàng" };
+    if (existing.fulfillment_status !== "pending" && existing.fulfillment_status !== "processing") {
+      return { error: "Chỉ có thể sửa đơn khi đang chờ xác nhận hoặc đang xử lý" };
+    }
+
+    const subtotal = input.items.reduce((sum, i) => sum + i.price * i.qty, 0);
+    const totals = calcTotals(subtotal, input.fee, input.discount, input.discountType);
+
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({
+        customer_id: input.customerId,
+        subtotal: totals.subtotal,
+        fee: totals.fee,
+        discount_amount: totals.discount,
+        discount_raw: input.discount,
+        discount_type: input.discountType,
+        total: totals.total,
+      })
+      .eq("id", id);
+    if (updateError) return { error: updateError.message };
+
+    const { error: deleteError } = await supabase.from("order_items").delete().eq("order_id", id);
+    if (deleteError) return { error: deleteError.message };
+
+    const { error: itemsError } = await supabase.from("order_items").insert(
+      input.items.map((item) => ({
+        order_id: id,
+        product_id: item.productId,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+      })),
+    );
+    if (itemsError) return { error: itemsError.message };
+
+    return { data: { id } };
+  },
+
   async cancel(id: string): Promise<void> {
     const supabase = await createClient();
     const { error } = await supabase
@@ -174,14 +241,21 @@ export const ordersService = {
   },
 
   /**
-   * Mirrors deliver(paid) from the design prototype:
+   * Mirrors deliver(paid) from the design prototype, with one deliberate
+   * deviation: the prototype only tracked debt for a real (non-walk-in)
+   * customer, since there'd be no one to bill later. Here "pay later"
+   * always becomes debt, walk-in included — the shop still gave away goods
+   * unpaid and wants that reflected in "Tổng phải thu"/Sổ nợ, even if it
+   * can't be attributed to a named person; it lands on the "Khách lẻ" row
+   * as one lump sum, collectible the same way as any other customer's debt.
    * - fulfillment_status -> "done"
    * - paid: payment_status "paid", payment_method "cash"
-   * - not paid, real customer (not walk-in): payment_status "debt",
-   *   payment_method "debt" — surfaces in customer_debts automatically.
-   * - not paid, walk-in customer: payment_status/payment_method "unpaid".
+   * - not paid: payment_status/payment_method "debt" — surfaces in
+   *   customer_debts automatically (grouped by customer_id, walk-in
+   *   included).
    * Looks the order's own customer_id up server-side rather than trusting
-   * a client-supplied one.
+   * a client-supplied one (kept even though customer_id no longer changes
+   * the outcome, since a future rule might need it again).
    */
   async deliver(id: string, paid: boolean): Promise<{ ok: true } | { error: string }> {
     const supabase = await createClient();
@@ -194,14 +268,12 @@ export const ordersService = {
     if (findError) throw findError;
     if (!order) return { error: "Không tìm thấy đơn hàng" };
 
-    const isDebt = !paid && order.customer_id !== WALKIN_CUSTOMER_ID;
-
     const { error } = await supabase
       .from("orders")
       .update({
         fulfillment_status: "done",
-        payment_status: paid ? "paid" : isDebt ? "debt" : "unpaid",
-        payment_method: paid ? "cash" : isDebt ? "debt" : "unpaid",
+        payment_status: paid ? "paid" : "debt",
+        payment_method: paid ? "cash" : "debt",
       })
       .eq("id", id);
     if (error) throw error;

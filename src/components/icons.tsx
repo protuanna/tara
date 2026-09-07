@@ -104,3 +104,12 @@ export function ReportIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function PencilIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon strokeWidth={1.8} {...props}>
+      <path d="M14.5 4.5 19.5 9.5 8.5 20.5H3.5v-5z" />
+      <path d="M13 6l5 5" />
+    </Icon>
+  );
+}

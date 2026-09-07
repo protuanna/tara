@@ -14,9 +14,11 @@ design (see Architecture below) rather than scoped per-user.
 
 All 8 screens from `docs/design/` are implemented: **Home** (`/`), the
 **Sale flow** (browse `/sale` → checkout `/checkout` → confirmation
-`/orders/[id]`), **Orders** (`/orders`, list + status/time/payment filters +
-cancel/mark-delivered), **Products** (`/products`, add category, add/delete
-product — no image upload yet, see below), **Debt** (`/debt`, "Sổ nợ" —
+`/orders/[id]`, with `/orders/[id]/edit` to amend a pending/processing order
+in place), **Orders** (`/orders`, list + status/time/payment filters +
+cancel/mark-delivered), **Products** (`/products`, category tabs including
+an "Tất cả" one, add category, add/delete product — no image upload yet, see
+below), **Debt** (`/debt`, "Sổ nợ" —
 total receivable + per-customer collect action), **Customers**
 (`/customers`, list + add + per-customer detail with order stats and
 collect-debt), and **Report** (`/report`, period tabs, revenue bar chart,
@@ -194,7 +196,15 @@ image tooling is installed) if the source logo changes:
   `POST /api/customers/[id]/collect-debt` — not decrementing a counter.
 - A walk-in customer ("Khách lẻ") is a real row in `customers`
   (`WALKIN_CUSTOMER_ID` in `types.ts`), not a null `customer_id`, so every
-  order always has a customer to join against.
+  order always has a customer to join against. Unlike the design prototype
+  (which only tracked debt for a real, non-walk-in customer, since there'd
+  be no one to bill later), this app's `ordersService.deliver()` marks
+  "pay later" as debt for walk-in orders too (migration `0003`, which
+  dropped `customer_debts`' old `where c.id <> <WALKIN_CUSTOMER_ID>` filter)
+  — the shop still gave away unpaid goods and wants that reflected in
+  "Tổng phải thu"/Sổ nợ, even though it can't be attributed to a named
+  person; it all lands on the "Khách lẻ" row as one lump sum, collectible
+  the same way as any other customer's debt.
 - A newly-saved order gets `fulfillment_status: "processing"` directly, not
   the `"pending"` column default — that's what the design prototype's
   `saveOrder()` does, so `ordersService.create()` sets it explicitly. Don't
@@ -212,6 +222,30 @@ image tooling is installed) if the source logo changes:
   fails, rather than using a real DB transaction (supabase-js has no
   multi-statement transaction API). A `create_order` Postgres RPC would fix
   that properly if it ever matters.
+- `/orders/[id]/edit` mirrors the design prototype's `startEdit()`/
+  `saveEdit()` — "same shape as checkout but mutates an existing order." The
+  edit icon (`PencilIcon`) only appears on `/orders/[id]` while
+  `fulfillment_status` is `pending`/`processing` (same `canDeliver` guard as
+  cancel/deliver); `ordersService.update()` re-checks that server-side too
+  (never trust the client not to hit the route directly on a done/cancelled
+  order). It's a `PATCH /api/orders/[id]` (on the resource route itself,
+  unlike cancel/deliver's nested sub-action routes, since this edits the
+  order's actual content rather than flipping a lifecycle state) and, like
+  `create()`, recomputes totals server-side via `calcTotals()` and replaces
+  `order_items` wholesale (delete + re-insert) rather than diffing — same
+  non-transactional caveat. The edit screen keeps its own local item-list
+  state seeded once from the loaded order (never re-synced from a refetch,
+  since there isn't one until Save navigates away) and does **not** touch
+  the global `CartProvider` — reusing that cart would corrupt whatever the
+  user has queued up on `/sale` for a *new* sale. Its own "+ Thêm sản phẩm"
+  is a self-contained category/product-picker `<Sheet>` fetching
+  `/api/categories` + `/api/products` directly, not the `/sale` screen.
+  `OrderDetailDTO.order_items` carries `product_id` (nullable —
+  `ON DELETE SET NULL` — a line's product may have been deleted since the
+  sale) specifically so edit can round-trip it; each edit-screen line is
+  keyed by the order_item's own `id` (or the product's `id` for a
+  freshly-added line), never by `product_id` itself, since a pre-existing
+  line can have a null one.
 - Order lifecycle mutations (`ordersService.cancel()` /
   `ordersService.deliver()`, exposed as `POST /api/orders/[id]/cancel` and
   `POST /api/orders/[id]/deliver`) and their confirm sheets are one shared

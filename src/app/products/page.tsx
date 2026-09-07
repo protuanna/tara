@@ -54,6 +54,12 @@ function ProductsScreen({
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // "Tất cả" (null) shows every group; a real category id filters to just
+  // that one; the "uncategorized" sentinel filters to the defensive
+  // "Chưa phân loại" bucket (products.category_id is nullable, ON DELETE
+  // SET NULL when a category is removed).
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
+
   const groups = useMemo(() => {
     return categories.map((cat) => ({
       category: cat,
@@ -68,6 +74,13 @@ function ProductsScreen({
       ),
     [products, categories],
   );
+
+  const visibleGroups =
+    selectedTab === null || selectedTab === "uncategorized"
+      ? groups
+      : groups.filter((g) => g.category.id === selectedTab);
+  const showUncategorized =
+    uncategorized.length > 0 && (selectedTab === null || selectedTab === "uncategorized");
 
   function openAddProduct(categoryId: string | null) {
     setProductError(null);
@@ -147,7 +160,43 @@ function ProductsScreen({
         </div>
       )}
 
-      {groups.map(({ category, items }) => (
+      {categories.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto">
+          <button
+            onClick={() => setSelectedTab(null)}
+            className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+              selectedTab === null ? "bg-primary text-white" : "border border-line bg-white text-ink"
+            }`}
+          >
+            Tất cả
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedTab(cat.id)}
+              className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+                selectedTab === cat.id ? "bg-primary text-white" : "border border-line bg-white text-ink"
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+          {uncategorized.length > 0 && (
+            <button
+              onClick={() => setSelectedTab("uncategorized")}
+              className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+                selectedTab === "uncategorized"
+                  ? "bg-primary text-white"
+                  : "border border-line bg-white text-ink"
+              }`}
+            >
+              Chưa phân loại
+            </button>
+          )}
+        </div>
+      )}
+
+      {visibleGroups.map(({ category, items }) => (
         <div key={category.id} className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
             <div className="text-sm font-bold">{category.name}</div>
@@ -199,7 +248,7 @@ function ProductsScreen({
         </div>
       ))}
 
-      {uncategorized.length > 0 && (
+      {showUncategorized && (
         <div className="flex flex-col gap-2">
           <div className="text-sm font-bold">Chưa phân loại</div>
           <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-white">

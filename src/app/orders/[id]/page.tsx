@@ -7,6 +7,7 @@ import { formatVnd } from "@/lib/format";
 import { formatOrderTime } from "@/lib/date";
 import { FULFILLMENT_LABEL, PAYMENT_LABEL } from "@/lib/order-labels";
 import { OrderStatusActions } from "@/components/order-status-actions";
+import { PencilIcon } from "@/components/icons";
 import { Skeleton } from "@/components/skeleton";
 import type { OrderDetailDTO } from "@/lib/services/ordersService";
 
@@ -46,7 +47,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         >
           ‹
         </Link>
-        <div className="text-base font-extrabold">Chi tiết đơn</div>
+        <div className="flex-1 text-base font-extrabold">Chi tiết đơn</div>
+        {canDeliver && (
+          <Link
+            href={`/orders/${order.id}/edit`}
+            aria-label="Sửa đơn hàng"
+            className="flex size-[34px] flex-none items-center justify-center rounded-[11px] border border-line bg-white text-primary-dark"
+          >
+            <PencilIcon className="size-[17px]" />
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4">
