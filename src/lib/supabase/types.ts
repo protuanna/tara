@@ -83,6 +83,7 @@ export interface Database {
           payment_method: PaymentMethod;
           subtotal: number;
           fee: number;
+          topping_fee: number;
           discount_amount: number;
           discount_raw: number;
           discount_type: DiscountType;
@@ -97,6 +98,7 @@ export interface Database {
           payment_method?: PaymentMethod;
           subtotal?: number;
           fee?: number;
+          topping_fee?: number;
           discount_amount?: number;
           discount_raw?: number;
           discount_type?: DiscountType;

@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       customerId?: string;
       items?: { productId: string; name: string; price: number; qty: number }[];
       fee?: number;
+      toppingFee?: number;
       discount?: number;
       discountType?: DiscountType;
     };
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
       customerId: body.customerId,
       items: body.items ?? [],
       fee: Number(body.fee) || 0,
+      toppingFee: Number(body.toppingFee) || 0,
       discount: Number(body.discount) || 0,
       discountType: body.discountType === "pct" ? "pct" : "vnd",
     });

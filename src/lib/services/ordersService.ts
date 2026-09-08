@@ -40,6 +40,7 @@ export type OrderDetailDTO = {
   created_at: string;
   subtotal: number;
   fee: number;
+  topping_fee: number;
   discount_amount: number;
   total: number;
   fulfillment_status: FulfillmentStatus;
@@ -94,7 +95,7 @@ export const ordersService = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, created_at, subtotal, fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, product_id, name, price, qty)",
+        "id, created_at, subtotal, fee, topping_fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, product_id, name, price, qty)",
       )
       .eq("id", id)
       .returns<OrderDetailDTO[]>()
@@ -114,13 +115,14 @@ export const ordersService = {
     customerId: string;
     items: { productId: string; name: string; price: number; qty: number }[];
     fee: number;
+    toppingFee: number;
     discount: number;
     discountType: DiscountType;
   }): Promise<{ data: { id: string } } | { error: string }> {
     if (input.items.length === 0) return { error: "Giỏ hàng trống" };
 
     const subtotal = input.items.reduce((sum, i) => sum + i.price * i.qty, 0);
-    const totals = calcTotals(subtotal, input.fee, input.discount, input.discountType);
+    const totals = calcTotals(subtotal, input.fee, input.toppingFee, input.discount, input.discountType);
 
     const supabase = await createClient();
 
@@ -135,6 +137,7 @@ export const ordersService = {
         payment_method: "unpaid",
         subtotal: totals.subtotal,
         fee: totals.fee,
+        topping_fee: totals.topping,
         discount_amount: totals.discount,
         discount_raw: input.discount,
         discount_type: input.discountType,
@@ -178,6 +181,7 @@ export const ordersService = {
       customerId: string;
       items: { productId: string | null; name: string; price: number; qty: number }[];
       fee: number;
+      toppingFee: number;
       discount: number;
       discountType: DiscountType;
     },
@@ -198,7 +202,7 @@ export const ordersService = {
     }
 
     const subtotal = input.items.reduce((sum, i) => sum + i.price * i.qty, 0);
-    const totals = calcTotals(subtotal, input.fee, input.discount, input.discountType);
+    const totals = calcTotals(subtotal, input.fee, input.toppingFee, input.discount, input.discountType);
 
     const { error: updateError } = await supabase
       .from("orders")
@@ -206,6 +210,7 @@ export const ordersService = {
         customer_id: input.customerId,
         subtotal: totals.subtotal,
         fee: totals.fee,
+        topping_fee: totals.topping,
         discount_amount: totals.discount,
         discount_raw: input.discount,
         discount_type: input.discountType,

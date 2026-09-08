@@ -98,6 +98,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <span className="font-bold text-processing">+ {formatVnd(order.fee)}</span>
             </div>
           )}
+          {order.topping_fee > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted">Topping</span>
+              <span className="font-bold text-processing">+ {formatVnd(order.topping_fee)}</span>
+            </div>
+          )}
           {order.discount_amount > 0 && (
             <div className="flex justify-between">
               <span className="text-muted">Giảm giá</span>

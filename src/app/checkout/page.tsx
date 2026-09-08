@@ -11,6 +11,7 @@ import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { FeePicker } from "@/components/fee-picker";
+import { ToppingPicker } from "@/components/topping-picker";
 import { DiscountPicker } from "@/components/discount-picker";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
@@ -37,6 +38,7 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
   const [addCustomerError, setAddCustomerError] = useState<string | null>(null);
 
   const [fee, setFee] = useState("");
+  const [topping, setTopping] = useState("");
   const [discount, setDiscount] = useState("");
   const [discountType, setDiscountType] = useState<DiscountType>("vnd");
 
@@ -44,8 +46,15 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const totals = useMemo(
-    () => calcTotals(cart.subtotal, Number(fee) || 0, Number(discount) || 0, discountType),
-    [cart.subtotal, fee, discount, discountType],
+    () =>
+      calcTotals(
+        cart.subtotal,
+        Number(fee) || 0,
+        Number(topping) || 0,
+        Number(discount) || 0,
+        discountType,
+      ),
+    [cart.subtotal, fee, topping, discount, discountType],
   );
 
   const selectedCustomer =
@@ -101,6 +110,7 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
         qty: i.qty,
       })),
       fee: Number(fee) || 0,
+      toppingFee: Number(topping) || 0,
       discount: Number(discount) || 0,
       discountType,
     });
@@ -168,6 +178,7 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
           <span className="font-bold">{formatVnd(cart.subtotal)}</span>
         </div>
         <FeePicker value={fee} onChange={setFee} />
+        <ToppingPicker value={topping} onChange={setTopping} />
         <DiscountPicker
           value={discount}
           onChange={setDiscount}
@@ -178,6 +189,12 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
           <div className="flex justify-between text-[13px]">
             <span className="text-muted">Phí vận chuyển</span>
             <span className="font-bold text-processing">+ {formatVnd(totals.fee)}</span>
+          </div>
+        )}
+        {totals.topping > 0 && (
+          <div className="flex justify-between text-[13px]">
+            <span className="text-muted">Topping</span>
+            <span className="font-bold text-processing">+ {formatVnd(totals.topping)}</span>
           </div>
         )}
         {totals.discount > 0 && (

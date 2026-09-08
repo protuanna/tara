@@ -10,6 +10,7 @@ import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { FeePicker } from "@/components/fee-picker";
+import { ToppingPicker } from "@/components/topping-picker";
 import { DiscountPicker } from "@/components/discount-picker";
 import type { OrderDetailDTO } from "@/lib/services/ordersService";
 import type { CustomerDTO } from "@/lib/services/customersService";
@@ -110,6 +111,7 @@ function EditOrderScreen({
   const [pickerCategoryId, setPickerCategoryId] = useState<string | null>(categories[0]?.id ?? null);
 
   const [fee, setFee] = useState(order.fee > 0 ? String(order.fee) : "");
+  const [topping, setTopping] = useState(order.topping_fee > 0 ? String(order.topping_fee) : "");
   const [discount, setDiscount] = useState(order.discount_amount > 0 ? String(order.discount_amount) : "");
   const [discountType, setDiscountType] = useState<DiscountType>("vnd");
 
@@ -118,8 +120,9 @@ function EditOrderScreen({
 
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.qty, 0), [items]);
   const totals = useMemo(
-    () => calcTotals(subtotal, Number(fee) || 0, Number(discount) || 0, discountType),
-    [subtotal, fee, discount, discountType],
+    () =>
+      calcTotals(subtotal, Number(fee) || 0, Number(topping) || 0, Number(discount) || 0, discountType),
+    [subtotal, fee, topping, discount, discountType],
   );
 
   const selectedCustomer =
@@ -179,6 +182,7 @@ function EditOrderScreen({
       customerId,
       items: items.map(({ productId, name, price, qty }) => ({ productId, name, price, qty })),
       fee: Number(fee) || 0,
+      toppingFee: Number(topping) || 0,
       discount: Number(discount) || 0,
       discountType,
     });
@@ -250,6 +254,7 @@ function EditOrderScreen({
           <span className="font-bold">{formatVnd(subtotal)}</span>
         </div>
         <FeePicker value={fee} onChange={setFee} />
+        <ToppingPicker value={topping} onChange={setTopping} />
         <DiscountPicker
           value={discount}
           onChange={setDiscount}
@@ -260,6 +265,12 @@ function EditOrderScreen({
           <div className="flex justify-between text-[13px]">
             <span className="text-muted">Phí vận chuyển</span>
             <span className="font-bold text-processing">+ {formatVnd(totals.fee)}</span>
+          </div>
+        )}
+        {totals.topping > 0 && (
+          <div className="flex justify-between text-[13px]">
+            <span className="text-muted">Topping</span>
+            <span className="font-bold text-processing">+ {formatVnd(totals.topping)}</span>
           </div>
         )}
         {totals.discount > 0 && (

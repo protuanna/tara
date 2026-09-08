@@ -24,6 +24,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       customerId: body.customerId,
       items: body.items,
       fee: Number(body.fee) || 0,
+      toppingFee: Number(body.toppingFee) || 0,
       discount: Number(body.discount) || 0,
       discountType: body.discountType === "pct" ? "pct" : "vnd",
     });

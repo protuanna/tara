@@ -246,29 +246,43 @@ image tooling is installed) if the source logo changes:
   keyed by the order_item's own `id` (or the product's `id` for a
   freshly-added line), never by `product_id` itself, since a pre-existing
   line can have a null one.
-- The "Phí vận chuyển" input on both checkout and `/orders/[id]/edit` is
-  `<FeePicker>` (`src/components/fee-picker.tsx`) — preset chips (5.000Đ up
-  to 50.000Đ) plus a "Khác" chip that reveals a free-entry input. It's pure
-  presentation over the same `fee` string state both screens already had;
-  no schema/service change, since that value still flows into
-  `calcTotals()`'s surcharge like before. Its "show the custom input"
-  state is seeded once from the incoming value (`> 0` and not one of the
-  presets) and then only driven by the user's own chip clicks — don't make
-  it re-derive from `value` on every render, or it'll fight someone typing
-  in the custom field. Its custom-amount `<input>` deliberately matches the
-  `<DiscountPicker>` amount input's padding (`px-2.5 py-2`) so the two sit
-  at the same height when a screen shows both.
-- `<DiscountPicker>` (`src/components/discount-picker.tsx`), used next to
-  `<FeePicker>` on both screens, puts the label, amount input, and VNĐ/%
-  toggle all on one row (not the toggle on its own row below, and not the
-  label above) — small pill buttons in a `flex-1` wrapper next to a
-  fixed-width `w-[80px]` input, both `flex-none` so the toggle absorbs the
-  rest of the row's width.
-- Focused `<input>`/`<textarea>`/`<select>` elements get a purple
-  `outline-color: var(--color-primary)` (`globals.css`, unlayered like the
-  16px font-size rule) instead of the browser's native blue focus ring —
-  recolored, not removed, to keep the accessibility benefit of a visible
-  focus indicator.
+- Checkout and `/orders/[id]/edit` both show three surcharge/discount
+  controls in the same shape: `<FeePicker>` ("Phí vận chuyển": 5.000Đ /
+  10.000Đ / 20.000Đ), `<ToppingPicker>` ("Topping": 0Đ / 10.000Đ), and
+  `<DiscountPicker>` ("Giảm giá", VNĐ or %). The two preset pickers are thin
+  wrappers around the shared `<AmountPicker label presets value onChange>`
+  (`src/components/amount-picker.tsx`) — preset chips plus a "Khác" chip
+  that reveals a free-entry input; adding a third "X preset picker" later
+  means adding another one-line wrapper around `<AmountPicker>`, not
+  copy-pasting the chip/input markup again. All three are pure presentation
+  over string state the screens already had (`fee`/`topping`/`discount`);
+  no schema/service coupling beyond feeding `calcTotals()`. Each picker's
+  "show the custom input" state is seeded once from its incoming value
+  (`> 0` and not one of its own presets — this still works for
+  `<ToppingPicker>` even though `0` is itself a valid preset, since the
+  `> 0` guard means a blank/zero field never force-opens custom mode) and
+  then only driven by the user's own chip clicks — don't make it re-derive
+  from `value` on every render, or it'll fight someone typing in the custom
+  field. `<DiscountPicker>` puts its label, amount input (`w-[130px]`), and
+  VNĐ/% toggle (fixed `w-[100px]`, split evenly) on one row, pushed to the
+  row's right edge via `justify-between`; `<AmountPicker>`'s custom-amount
+  `<input>` matches that same 130+8+100=238px width and right alignment, so
+  every row's right-aligned control lines up as one visual block.
+  `topping_fee` (migration `0006`) is additive alongside `fee` in
+  `calcTotals()` (`total = subtotal + fee + topping - discount`, and the
+  VNĐ discount cap now includes it too) — a deliberate app-specific
+  extension of the design prototype's formula, which never had a topping
+  concept.
+- Focused `<input>`/`<textarea>`/`<select>` elements get a 1px purple
+  outline (`outline: 1px solid var(--color-primary)` in `globals.css`,
+  unlayered like the 16px font-size rule) instead of the browser's default
+  (wider, blue) focus ring — recolored and thinned, not removed, to keep
+  the accessibility benefit of a visible focus indicator. The header search
+  input (`.header-search-input` in `site-header.tsx`) opts out of it
+  entirely (`input.header-search-input:focus { outline: none; }`, which
+  wins on selector specificity) since it's a borderless rounded pill on a
+  colored bar, not a bordered form field like the rest of the app — a hard
+  focus outline there looks like a stray box rather than a focus state.
 - Order lifecycle mutations (`ordersService.cancel()` /
   `ordersService.deliver()`, exposed as `POST /api/orders/[id]/cancel` and
   `POST /api/orders/[id]/deliver`) and their confirm sheets are one shared
