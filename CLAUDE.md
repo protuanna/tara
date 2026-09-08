@@ -403,3 +403,72 @@ image tooling is installed) if the source logo changes:
   colors from the design (e.g. the quick-action tile backgrounds) aren't in
   the theme yet and use arbitrary values; promote them to tokens if they
   turn out to be reused elsewhere.
+
+## PayOS integration
+
+Every order gets a payOS QR payment code at creation, shown on the order
+detail page while `payment_status = "unpaid"`; a webhook flips it to paid
+automatically once the transfer arrives. Uses the official `@payos/node`
+SDK (`src/lib/payos.ts`) rather than hand-rolled HMAC signing — payOS's
+signature scheme (sort fields alphabetically, `key=value&...`, HMAC-SHA256
+with the checksum key) is easy to get subtly wrong, and a wrong
+implementation here is a payment-integrity bug, not a cosmetic one.
+
+- **Credentials**: `PAYOS_CLIENT_ID` / `PAYOS_API_KEY` / `PAYOS_CHECKSUM_KEY`
+  (server-only) and `NEXT_PUBLIC_SITE_URL` (the app's own public URL, used
+  for `returnUrl`/`cancelUrl` on payment links and as the default webhook
+  target) — see `.env.local.example`. Must also be set in Vercel's project
+  env vars, not just `.env.local`, since the webhook and any production
+  order creation run there.
+- **Schema** (migration `0007`): `orders.payos_order_code` (a `bigint`
+  defaulting from `payos_order_code_seq`, unique per order) is what payOS's
+  `orderCode` actually is — payOS requires a unique *numeric* code per
+  payment link, and `orders.id` is a UUID, so it can't double as one.
+  `payos_qr_code` (the VietQR/EMVCo payload string — payOS never returns an
+  image, every integration renders this client-side, here via `<QrCode>` in
+  `src/components/qr-code.tsx` using the `qrcode` package's
+  `toCanvas()`), `payos_checkout_url`, and `payos_payment_link_id` are
+  filled in after a successful `paymentRequests.create()` call.
+- **`payosService.createPaymentLink()`** (`src/lib/services/payosService.ts`)
+  is deliberately best-effort: it catches and logs its own errors and
+  returns `null` instead of throwing, because creating the *order* must
+  never fail just because payOS is down/misconfigured — `ordersService.create()`
+  calls it after the order + order_items are already committed, and only
+  writes the QR/checkout-url/payment-link-id columns if it succeeds. A
+  `null` here just means the order detail page has no QR section to show,
+  not an error state.
+- **Webhook receiver**: `POST /api/webhooks/payos`
+  (`src/app/api/webhooks/payos/route.ts`) parses the body, calls
+  `payosService.verifyWebhook()` (throws payOS's own `InvalidSignatureError`
+  on a bad signature — never trust webhook data before this check passes),
+  and on `code === "00"` calls `ordersService.markPaidViaWebhook(orderCode, amount)`.
+  That method is intentionally idempotent (no-ops if the order is already
+  `payment_status = "paid"`) and amount-checked (no-ops, with a logged
+  error, if the webhook's amount doesn't match `orders.total`) since payOS
+  retries webhook delivery until it gets a 2xx — a repeat delivery for an
+  already-paid order is an expected, routine case, not a bug. It only
+  touches `payment_status`/`payment_method` (→ `"paid"`/`"qr"`), never
+  `fulfillment_status` — a customer can pay the QR before the shop has
+  fulfilled the order, so payment and fulfillment are independent here,
+  unlike `deliver()` where they change together.
+- **Webhook registration** is a one-time setup step, not something the app
+  does automatically per-request: run
+  `node --env-file=.env.local scripts/register-payos-webhook.mjs` once
+  after deploying (payOS itself calls the URL to validate it responds
+  correctly before registering it, so the target must already be live).
+  Re-run it if the deployed domain ever changes.
+- **Editing an order regenerates its QR when the total changes**:
+  `ordersService.update()` compares the recomputed `totals.total` against
+  the order's previous `total`, and only if they differ (and the order is
+  still `payment_status = "unpaid"`) does it cancel the old payOS payment
+  link (`payosService.cancelPaymentLink()`, best-effort) and mint a
+  replacement with a brand-new `orderCode`. payOS payment links can't be
+  edited in place — there's no "update amount" endpoint, only
+  create/get/cancel — and reusing a cancelled link's orderCode isn't
+  documented as safe, so a fresh numeric code is always minted via the
+  `next_payos_order_code()` Postgres function (migration `0008`; a plain
+  `nextval()` wrapped in SQL so it's callable through `supabase.rpc()`,
+  since it isn't a table row the normal `insert`'s column default can
+  supply outside of an `INSERT`). This whole regeneration step is
+  best-effort like `create()`'s original QR — a payOS failure here logs and
+  moves on rather than blocking the edit.

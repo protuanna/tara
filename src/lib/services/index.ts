@@ -7,3 +7,4 @@ export { homeService } from "./homeService";
 export { reportService } from "./reportService";
 export { pushService } from "./pushService";
 export { notificationsService } from "./notificationsService";
+export { payosService } from "./payosService";

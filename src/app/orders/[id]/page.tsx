@@ -8,6 +8,7 @@ import { formatOrderTime } from "@/lib/date";
 import { FULFILLMENT_LABEL, PAYMENT_LABEL } from "@/lib/order-labels";
 import { OrderStatusActions } from "@/components/order-status-actions";
 import { PencilIcon } from "@/components/icons";
+import { QrCode } from "@/components/qr-code";
 import { Skeleton } from "@/components/skeleton";
 import type { OrderDetailDTO } from "@/lib/services/ordersService";
 
@@ -124,6 +125,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <span className={`font-bold ${payment.fg}`}>{payment.label}</span>
         </div>
       </div>
+
+      {order.payment_status === "unpaid" && order.payos_qr_code && (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-white p-4">
+          <div className="text-[13px] font-bold">Quét mã để thanh toán</div>
+          <QrCode value={order.payos_qr_code} />
+          <p className="text-center text-[11.5px] text-muted">
+            Đơn sẽ tự động chuyển sang &quot;Đã thanh toán&quot; ngay khi nhận được tiền.
+          </p>
+        </div>
+      )}
 
       {canDeliver ? (
         <OrderStatusActions orderId={order.id} onChanged={refetch} variant="page" />

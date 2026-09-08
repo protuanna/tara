@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { calcTotals, type DiscountType } from "@/lib/pricing";
 import { vnTodayStartIso, daysAgoIso } from "@/lib/date";
+import { payosService } from "./payosService";
 import type { FulfillmentStatus, PaymentStatus, PaymentMethod } from "@/lib/supabase/types";
 
 export type StatusFilter = "all" | FulfillmentStatus;
@@ -48,6 +49,8 @@ export type OrderDetailDTO = {
   customer_id: string;
   customers: { name: string } | null;
   order_items: { id: string; product_id: string | null; name: string; price: number; qty: number }[];
+  payos_qr_code: string | null;
+  payos_checkout_url: string | null;
 };
 
 export const ordersService = {
@@ -95,7 +98,7 @@ export const ordersService = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, created_at, subtotal, fee, topping_fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, product_id, name, price, qty)",
+        "id, created_at, subtotal, fee, topping_fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, product_id, name, price, qty), payos_qr_code, payos_checkout_url",
       )
       .eq("id", id)
       .returns<OrderDetailDTO[]>()
@@ -143,7 +146,7 @@ export const ordersService = {
         discount_type: input.discountType,
         total: totals.total,
       })
-      .select("id")
+      .select("id, payos_order_code")
       .single();
 
     if (orderError || !order) return { error: orderError?.message ?? "Không thể tạo đơn hàng" };
@@ -161,6 +164,25 @@ export const ordersService = {
     if (itemsError) {
       await supabase.from("orders").delete().eq("id", order.id);
       return { error: itemsError.message };
+    }
+
+    // Best-effort: every order gets a payOS QR, but payOS being down/
+    // misconfigured must never block creating the order itself.
+    if (order.payos_order_code !== null) {
+      const link = await payosService.createPaymentLink({
+        orderCode: order.payos_order_code,
+        amount: totals.total,
+      });
+      if (link) {
+        await supabase
+          .from("orders")
+          .update({
+            payos_qr_code: link.qrCode,
+            payos_checkout_url: link.checkoutUrl,
+            payos_payment_link_id: link.paymentLinkId,
+          })
+          .eq("id", order.id);
+      }
     }
 
     return { data: { id: order.id } };
@@ -192,7 +214,7 @@ export const ordersService = {
 
     const { data: existing, error: findError } = await supabase
       .from("orders")
-      .select("fulfillment_status")
+      .select("fulfillment_status, payment_status, total, payos_payment_link_id")
       .eq("id", id)
       .maybeSingle();
     if (findError) throw findError;
@@ -232,6 +254,32 @@ export const ordersService = {
       })),
     );
     if (itemsError) return { error: itemsError.message };
+
+    // Total changed while the order still has an outstanding QR — the old
+    // one still encodes the stale amount, and payOS payment links can't be
+    // edited in place, so cancel it and mint a replacement. Best-effort,
+    // same as create(): a payOS hiccup here must not fail the edit itself.
+    if (existing.payment_status === "unpaid" && totals.total !== existing.total) {
+      if (existing.payos_payment_link_id) {
+        await payosService.cancelPaymentLink(existing.payos_payment_link_id);
+      }
+      const { data: newOrderCode } = await supabase.rpc("next_payos_order_code");
+      if (typeof newOrderCode === "number") {
+        const link = await payosService.createPaymentLink({
+          orderCode: newOrderCode,
+          amount: totals.total,
+        });
+        await supabase
+          .from("orders")
+          .update({
+            payos_order_code: newOrderCode,
+            payos_qr_code: link?.qrCode ?? null,
+            payos_checkout_url: link?.checkoutUrl ?? null,
+            payos_payment_link_id: link?.paymentLinkId ?? null,
+          })
+          .eq("id", id);
+      }
+    }
 
     return { data: { id } };
   },
@@ -284,5 +332,49 @@ export const ordersService = {
     if (error) throw error;
 
     return { ok: true };
+  },
+
+  /**
+   * Called from the payOS webhook route once its signature has already
+   * been verified — never call this from anywhere that hasn't checked the
+   * signature first. Unlike `deliver()`, this only touches payment_status/
+   * payment_method: a customer can scan and pay the QR before the shop has
+   * fulfilled the order (fulfillment_status stays whatever it already
+   * was), so payment and fulfillment are independent here. Idempotent by
+   * design — payOS retries webhook delivery until it gets a 2xx, so a
+   * repeat delivery for an already-paid order is a normal, expected no-op,
+   * not an error.
+   */
+  async markPaidViaWebhook(orderCode: number, amount: number): Promise<void> {
+    const supabase = await createClient();
+
+    const { data: order, error: findError } = await supabase
+      .from("orders")
+      .select("id, total, payment_status")
+      .eq("payos_order_code", orderCode)
+      .maybeSingle();
+    if (findError) throw findError;
+    if (!order) {
+      console.error("[ordersService.markPaidViaWebhook] no order for payos_order_code", orderCode);
+      return;
+    }
+    if (order.payment_status === "paid") return;
+    if (order.total !== amount) {
+      console.error(
+        "[ordersService.markPaidViaWebhook] amount mismatch for order",
+        order.id,
+        "expected",
+        order.total,
+        "got",
+        amount,
+      );
+      return;
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ payment_status: "paid", payment_method: "qr" })
+      .eq("id", order.id);
+    if (error) throw error;
   },
 };

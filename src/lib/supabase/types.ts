@@ -88,6 +88,10 @@ export interface Database {
           discount_raw: number;
           discount_type: DiscountType;
           total: number;
+          payos_order_code: number | null;
+          payos_qr_code: string | null;
+          payos_checkout_url: string | null;
+          payos_payment_link_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -103,6 +107,10 @@ export interface Database {
           discount_raw?: number;
           discount_type?: DiscountType;
           total?: number;
+          payos_order_code?: number | null;
+          payos_qr_code?: string | null;
+          payos_checkout_url?: string | null;
+          payos_payment_link_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;
@@ -198,7 +206,12 @@ export interface Database {
         Relationships: [];
       };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      next_payos_order_code: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+    };
     Enums: {
       fulfillment_status: FulfillmentStatus;
       payment_status: PaymentStatus;
