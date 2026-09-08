@@ -51,14 +51,16 @@ export function FeePicker({ value, onChange }: { value: string; onChange: (v: st
         </button>
       </div>
       {customOpen && (
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          inputMode="numeric"
-          placeholder="Nhập số tiền"
-          autoFocus
-          className="rounded-[10px] border border-line px-2.5 py-2 text-base font-bold text-ink"
-        />
+        <div className="flex justify-end">
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            inputMode="numeric"
+            placeholder="Nhập số tiền"
+            autoFocus
+            className="w-[130px] rounded-[10px] border border-line px-2.5 py-2 text-right text-base font-bold text-ink"
+          />
+        </div>
       )}
     </div>
   );
