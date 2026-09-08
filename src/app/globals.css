@@ -49,6 +49,18 @@ select {
 }
 
 /*
+ * Browsers default a focused form field's outline to blue (Chrome/Safari's
+ * native focus-ring color), which clashes with the app's purple palette —
+ * recolor it to --color-primary instead of resetting outline entirely, to
+ * keep the accessibility benefit of a visible focus indicator.
+ */
+input:focus,
+textarea:focus,
+select:focus {
+  outline-color: var(--color-primary);
+}
+
+/*
  * Horizontal chip/tab strips (category tabs on /sale and /products,
  * status/filter tabs on /orders) scroll via touch/drag — a visible
  * scrollbar there is a desktop-browser artifact, not part of the design

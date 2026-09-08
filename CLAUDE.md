@@ -259,10 +259,16 @@ image tooling is installed) if the source logo changes:
   `<DiscountPicker>` amount input's padding (`px-2.5 py-2`) so the two sit
   at the same height when a screen shows both.
 - `<DiscountPicker>` (`src/components/discount-picker.tsx`), used next to
-  `<FeePicker>` on both screens, puts the VNĐ/% discount-type toggle inline
-  beside the amount input (not on its own row below) — small pill buttons
-  in a `flex-1` wrapper next to a fixed-width `w-[110px]` input, rather than
-  the toggle spanning full width like the old layout.
+  `<FeePicker>` on both screens, puts the label, amount input, and VNĐ/%
+  toggle all on one row (not the toggle on its own row below, and not the
+  label above) — small pill buttons in a `flex-1` wrapper next to a
+  fixed-width `w-[80px]` input, both `flex-none` so the toggle absorbs the
+  rest of the row's width.
+- Focused `<input>`/`<textarea>`/`<select>` elements get a purple
+  `outline-color: var(--color-primary)` (`globals.css`, unlayered like the
+  16px font-size rule) instead of the browser's native blue focus ring —
+  recolored, not removed, to keep the accessibility benefit of a visible
+  focus indicator.
 - Order lifecycle mutations (`ordersService.cancel()` /
   `ordersService.deliver()`, exposed as `POST /api/orders/[id]/cancel` and
   `POST /api/orders/[id]/deliver`) and their confirm sheets are one shared
