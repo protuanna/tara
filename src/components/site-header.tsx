@@ -22,7 +22,7 @@ export function SiteHeader() {
         <SearchIcon width={16} height={16} className="text-muted" />
         <input
           placeholder="Tìm sản phẩm, đơn, khách..."
-          className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
+          className="header-search-input min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
         />
       </div>
       <NotificationBell />

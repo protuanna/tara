@@ -61,6 +61,17 @@ select:focus {
 }
 
 /*
+ * The header search field is a borderless rounded pill sitting on a colored
+ * gradient bar, not a bordered form field like the rest of the app — the
+ * purple focus outline above reads as a hard-edged box clashing with that
+ * pill shape, so it opts out. The `input.` compound selector's specificity
+ * beats the plain `input:focus` rule above regardless of source order.
+ */
+input.header-search-input:focus {
+  outline: none;
+}
+
+/*
  * Horizontal chip/tab strips (category tabs on /sale and /products,
  * status/filter tabs on /orders) scroll via touch/drag — a visible
  * scrollbar there is a desktop-browser artifact, not part of the design
