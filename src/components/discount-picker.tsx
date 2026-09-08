@@ -29,11 +29,11 @@ export function DiscountPicker({
         placeholder="0"
         className="w-[80px] flex-none rounded-[10px] border border-line px-2 py-2 text-right text-base font-bold text-ink"
       />
-      <div className="flex flex-1 gap-1 rounded-[10px] bg-page p-0.5">
+      <div className="flex h-[42px] gap-1 rounded-[10px] bg-page p-0.5">
         <button
           type="button"
           onClick={() => onTypeChange("vnd")}
-          className={`flex-1 rounded-lg py-1 text-[10px] font-bold ${
+          className={`flex items-center justify-center rounded-lg px-[5px] text-[10px] font-bold ${
             type === "vnd" ? "bg-primary text-white" : "text-muted"
           }`}
         >
@@ -42,7 +42,7 @@ export function DiscountPicker({
         <button
           type="button"
           onClick={() => onTypeChange("pct")}
-          className={`flex-1 rounded-lg py-1 text-[10px] font-bold ${
+          className={`flex items-center justify-center rounded-lg px-[5px] text-[10px] font-bold ${
             type === "pct" ? "bg-primary text-white" : "text-muted"
           }`}
         >
