@@ -11,6 +11,7 @@ import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { FeePicker } from "@/components/fee-picker";
+import { DiscountPicker } from "@/components/discount-picker";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
 type Customer = { id: string; name: string; phone: string | null };
@@ -167,36 +168,12 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
           <span className="font-bold">{formatVnd(cart.subtotal)}</span>
         </div>
         <FeePicker value={fee} onChange={setFee} />
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2.5">
-            <span className="flex-1 text-[13px] text-muted">Giảm giá</span>
-            <input
-              value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
-              inputMode="numeric"
-              placeholder="0"
-              className="w-[110px] rounded-[10px] border border-line px-2.5 py-2 text-right text-base font-bold text-ink"
-            />
-          </label>
-          <div className="flex gap-1 rounded-[11px] bg-page p-1">
-            <button
-              onClick={() => setDiscountType("vnd")}
-              className={`flex-1 rounded-lg py-2 text-xs font-bold ${
-                discountType === "vnd" ? "bg-primary text-white" : "text-muted"
-              }`}
-            >
-              Theo tiền (Đ)
-            </button>
-            <button
-              onClick={() => setDiscountType("pct")}
-              className={`flex-1 rounded-lg py-2 text-xs font-bold ${
-                discountType === "pct" ? "bg-primary text-white" : "text-muted"
-              }`}
-            >
-              Theo %
-            </button>
-          </div>
-        </div>
+        <DiscountPicker
+          value={discount}
+          onChange={setDiscount}
+          type={discountType}
+          onTypeChange={setDiscountType}
+        />
         {totals.fee > 0 && (
           <div className="flex justify-between text-[13px]">
             <span className="text-muted">Phí vận chuyển</span>

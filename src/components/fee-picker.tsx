@@ -57,7 +57,7 @@ export function FeePicker({ value, onChange }: { value: string; onChange: (v: st
           inputMode="numeric"
           placeholder="Nhập số tiền"
           autoFocus
-          className="rounded-[10px] border border-line px-3 py-3 text-base font-bold text-ink"
+          className="rounded-[10px] border border-line px-2.5 py-2 text-base font-bold text-ink"
         />
       )}
     </div>

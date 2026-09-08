@@ -255,7 +255,14 @@ image tooling is installed) if the source logo changes:
   state is seeded once from the incoming value (`> 0` and not one of the
   presets) and then only driven by the user's own chip clicks — don't make
   it re-derive from `value` on every render, or it'll fight someone typing
-  in the custom field.
+  in the custom field. Its custom-amount `<input>` deliberately matches the
+  `<DiscountPicker>` amount input's padding (`px-2.5 py-2`) so the two sit
+  at the same height when a screen shows both.
+- `<DiscountPicker>` (`src/components/discount-picker.tsx`), used next to
+  `<FeePicker>` on both screens, puts the VNĐ/% discount-type toggle inline
+  beside the amount input (not on its own row below) — small pill buttons
+  in a `flex-1` wrapper next to a fixed-width `w-[110px]` input, rather than
+  the toggle spanning full width like the old layout.
 - Order lifecycle mutations (`ordersService.cancel()` /
   `ordersService.deliver()`, exposed as `POST /api/orders/[id]/cancel` and
   `POST /api/orders/[id]/deliver`) and their confirm sheets are one shared
