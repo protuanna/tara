@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { formatVnd } from "@/lib/format";
 
-const FEE_PRESETS = [5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000];
+const FEE_PRESETS = [5000, 10000, 20000];
 
 /**
  * Shared "Phí vận chuyển" picker for checkout and order-edit — quick preset
- * chips (5.000Đ .. 50.000Đ) plus a "Khác" chip that reveals a free-entry
- * input for anything else. Writes into the same `fee` field the rest of the
- * pricing pipeline already uses (`calcTotals()`'s surcharge), so no schema
- * or service change is needed, only this input's presentation.
+ * chips (5.000Đ / 10.000Đ / 20.000Đ) plus a "Khác" chip that reveals a
+ * free-entry input for anything else. Writes into the same `fee` field the
+ * rest of the pricing pipeline already uses (`calcTotals()`'s surcharge),
+ * so no schema or service change is needed, only this input's presentation.
  */
 export function FeePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const numValue = Number(value) || 0;
@@ -52,13 +52,16 @@ export function FeePicker({ value, onChange }: { value: string; onChange: (v: st
       </div>
       {customOpen && (
         <div className="flex justify-end">
+          {/* 238px = DiscountPicker's 130px amount input + gap-2 (8px) +
+              its 100px VNĐ/% toggle, so both rows' right-aligned controls
+              line up as one visual block. */}
           <input
             value={value}
             onChange={(e) => onChange(e.target.value)}
             inputMode="numeric"
             placeholder="Nhập số tiền"
             autoFocus
-            className="w-[130px] rounded-[10px] border border-line px-2.5 py-2 text-right text-base font-bold text-ink"
+            className="w-[238px] rounded-[10px] border border-line px-2.5 py-2 text-right text-base font-bold text-ink"
           />
         </div>
       )}
