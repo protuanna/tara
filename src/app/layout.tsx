@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { BottomNav } from "@/components/bottom-nav";
+import { ResumeToast } from "@/components/resume-toast";
 import { CartProvider } from "@/lib/cart-context";
 import "./globals.css";
 
@@ -38,6 +39,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <CartProvider>
+          <ResumeToast />
           <div className="mx-auto flex h-dvh max-w-[480px] flex-col overflow-hidden bg-surface shadow-xl">
             <SiteHeader />
             <div className="flex-1 overflow-y-auto">{children}</div>

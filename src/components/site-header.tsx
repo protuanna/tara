@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ShopIcon, SearchIcon, ScanIcon } from "@/components/icons";
+import { ShopIcon, SearchIcon } from "@/components/icons";
+import { NotificationBell } from "@/components/notification-bell";
 
 /**
  * Global header shown on every screen (matches the design prototype, where
@@ -24,13 +25,7 @@ export function SiteHeader() {
           className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
         />
       </div>
-      <Link
-        href="/products"
-        aria-label="Sản phẩm"
-        className="flex size-[38px] flex-none items-center justify-center rounded-full bg-white/20 text-white"
-      >
-        <ScanIcon width={19} height={19} />
-      </Link>
+      <NotificationBell />
     </div>
   );
 }

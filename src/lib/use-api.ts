@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { beginRefetch, endRefetch, announceResume } from "@/lib/refetch-indicator";
 
 type ApiSuccess<T> = { data: T };
 type ApiFailure = { error: string; message: string; statusCode: number };
@@ -18,6 +19,32 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  // Installed home-screen apps (iOS PWAs especially) get suspended and
+  // resumed rather than reloaded when the user switches away and back —
+  // the page/JS state just sits there, so without this the last-fetched
+  // data stays on screen indefinitely instead of picking up anything that
+  // changed while the app was in the background. Refetching here is safe
+  // to do quietly: `loading` flips back to true but `data` is untouched
+  // until the new response lands, and every screen already gates its
+  // skeleton on `!data` (see the CLAUDE.md loading-gate note), not on
+  // `loading` alone.
+  useEffect(() => {
+    function handleResume() {
+      if (document.visibilityState === "visible") {
+        announceResume();
+        setReloadKey((k) => k + 1);
+      }
+    }
+    document.addEventListener("visibilitychange", handleResume);
+    window.addEventListener("pageshow", handleResume);
+    return () => {
+      document.removeEventListener("visibilitychange", handleResume);
+      window.removeEventListener("pageshow", handleResume);
+    };
+  }, []);
 
   useEffect(() => {
     if (!url) {
@@ -25,6 +52,12 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
       return;
     }
     let cancelled = false;
+    // A revalidation (data already on screen from a prior load) feeds the
+    // activeCount that <ResumeToast> watches to know when a resume-
+    // triggered refetch has finished; the very first load already has its
+    // own skeleton, so it's not counted here.
+    const isRevalidation = dataRef.current !== null;
+    if (isRevalidation) beginRefetch();
     setLoading(true);
     setError(null);
     fetch(url)
@@ -39,6 +72,7 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+        if (isRevalidation) endRefetch();
       });
     return () => {
       cancelled = true;

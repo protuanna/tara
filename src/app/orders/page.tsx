@@ -90,7 +90,7 @@ function OrdersContent() {
   return (
     <div className="flex flex-col">
       <div className="sticky top-0 z-[4] flex items-center gap-2.5 border-b border-line bg-white px-4 py-3">
-        <div className="flex flex-1 gap-2 overflow-x-auto">
+        <div className="no-scrollbar flex flex-1 gap-2 overflow-x-auto">
           {STATUS_TABS.map((tab) => {
             const active = tab.value === activeStatus;
             const label =
@@ -239,7 +239,7 @@ function OrdersSkeleton() {
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2.5 border-b border-line bg-white px-4 py-3">
-        <div className="flex flex-1 gap-2 overflow-x-auto">
+        <div className="no-scrollbar flex flex-1 gap-2 overflow-x-auto">
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-8 w-20 flex-none rounded-full" />
           ))}

@@ -23,13 +23,16 @@ export default function SalePage() {
 function SaleScreen({ categories, products }: { categories: CategoryDTO[]; products: ProductDTO[] }) {
   const router = useRouter();
   const cart = useCart();
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-    categories[0]?.id ?? null,
-  );
+  // "Tất cả" (undefined) shows every product; a real category id filters
+  // to just that one — matches the /products screen's tab convention.
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
 
   const filteredProducts = useMemo(
-    () => products.filter((p) => p.category_id === selectedCategoryId),
+    () =>
+      selectedCategoryId === undefined
+        ? products
+        : products.filter((p) => p.category_id === selectedCategoryId),
     [products, selectedCategoryId],
   );
 
@@ -62,7 +65,17 @@ function SaleScreen({ categories, products }: { categories: CategoryDTO[]; produ
 
   return (
     <div className="flex flex-col">
-      <div className="flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
+        <button
+          onClick={() => setSelectedCategoryId(undefined)}
+          className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+            selectedCategoryId === undefined
+              ? "bg-primary text-white"
+              : "border border-line bg-white text-ink"
+          }`}
+        >
+          Tất cả
+        </button>
         {categories.map((cat) => (
           <button
             key={cat.id}
@@ -220,7 +233,7 @@ function SaleScreen({ categories, products }: { categories: CategoryDTO[]; produ
 function SaleSkeleton() {
   return (
     <div className="flex flex-col">
-      <div className="flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-9 w-24 flex-none rounded-full" />
         ))}
