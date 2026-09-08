@@ -94,7 +94,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           {order.fee > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted">Phụ thu</span>
+              <span className="text-muted">Phí vận chuyển</span>
               <span className="font-bold text-processing">+ {formatVnd(order.fee)}</span>
             </div>
           )}

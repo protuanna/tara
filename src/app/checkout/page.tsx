@@ -10,6 +10,7 @@ import { calcTotals, type DiscountType } from "@/lib/pricing";
 import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
+import { FeePicker } from "@/components/fee-picker";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
 type Customer = { id: string; name: string; phone: string | null };
@@ -165,16 +166,7 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
           <span className="text-muted">Tiền hàng</span>
           <span className="font-bold">{formatVnd(cart.subtotal)}</span>
         </div>
-        <label className="flex items-center gap-2.5">
-          <span className="flex-1 text-[13px] text-muted">Phụ thu (Đ)</span>
-          <input
-            value={fee}
-            onChange={(e) => setFee(e.target.value)}
-            inputMode="numeric"
-            placeholder="0"
-            className="w-[110px] rounded-[10px] border border-line px-2.5 py-2 text-right text-base font-bold text-ink"
-          />
-        </label>
+        <FeePicker value={fee} onChange={setFee} />
         <div className="flex flex-col gap-2">
           <label className="flex items-center gap-2.5">
             <span className="flex-1 text-[13px] text-muted">Giảm giá</span>
@@ -207,7 +199,7 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
         </div>
         {totals.fee > 0 && (
           <div className="flex justify-between text-[13px]">
-            <span className="text-muted">Phụ thu</span>
+            <span className="text-muted">Phí vận chuyển</span>
             <span className="font-bold text-processing">+ {formatVnd(totals.fee)}</span>
           </div>
         )}

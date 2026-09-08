@@ -246,6 +246,16 @@ image tooling is installed) if the source logo changes:
   keyed by the order_item's own `id` (or the product's `id` for a
   freshly-added line), never by `product_id` itself, since a pre-existing
   line can have a null one.
+- The "Phí vận chuyển" input on both checkout and `/orders/[id]/edit` is
+  `<FeePicker>` (`src/components/fee-picker.tsx`) — preset chips (5.000Đ up
+  to 50.000Đ) plus a "Khác" chip that reveals a free-entry input. It's pure
+  presentation over the same `fee` string state both screens already had;
+  no schema/service change, since that value still flows into
+  `calcTotals()`'s surcharge like before. Its "show the custom input"
+  state is seeded once from the incoming value (`> 0` and not one of the
+  presets) and then only driven by the user's own chip clicks — don't make
+  it re-derive from `value` on every render, or it'll fight someone typing
+  in the custom field.
 - Order lifecycle mutations (`ordersService.cancel()` /
   `ordersService.deliver()`, exposed as `POST /api/orders/[id]/cancel` and
   `POST /api/orders/[id]/deliver`) and their confirm sheets are one shared
