@@ -10,6 +10,7 @@ import { FULFILLMENT_LABEL, PAYMENT_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/or
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { OrderStatusActions } from "@/components/order-status-actions";
+import { CollectOrderPayment } from "@/components/collect-order-payment";
 import type {
   OrderListRow,
   StatusCounts,
@@ -135,6 +136,8 @@ function OrdersContent() {
           const itemCount = order.order_items.reduce((sum, i) => sum + i.qty, 0);
           const showActions =
             order.fulfillment_status === "pending" || order.fulfillment_status === "processing";
+          const showCollectPayment =
+            order.fulfillment_status === "done" && order.payment_status === "debt";
 
           return (
             <Link
@@ -163,7 +166,20 @@ function OrdersContent() {
               </div>
 
               {showActions && (
-                <OrderStatusActions orderId={order.id} onChanged={refetch} variant="row" />
+                <OrderStatusActions
+                  orderId={order.id}
+                  paymentStatus={order.payment_status}
+                  onChanged={refetch}
+                  variant="row"
+                />
+              )}
+              {showCollectPayment && (
+                <CollectOrderPayment
+                  orderId={order.id}
+                  total={order.total}
+                  onChanged={refetch}
+                  variant="row"
+                />
               )}
             </Link>
           );

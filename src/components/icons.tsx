@@ -113,3 +113,14 @@ export function PencilIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+export function ShareIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon strokeWidth={1.8} {...props}>
+      <circle cx="18" cy="5.5" r="2.5" />
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="18.5" r="2.5" />
+      <path d="M8.2 10.7 15.8 6.9M8.2 13.3l7.6 3.8" />
+    </Icon>
+  );
+}

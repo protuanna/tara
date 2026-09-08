@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ordersService, payosService } from "@/lib/services";
+import { ordersService, payosService, notificationsService, pushService } from "@/lib/services";
+import { formatVnd } from "@/lib/format";
 import type { Webhook } from "@payos/node";
 
 /**
@@ -32,7 +33,24 @@ export async function POST(request: Request) {
 
   if (webhookData.code === "00") {
     try {
-      await ordersService.markPaidViaWebhook(webhookData.orderCode, webhookData.amount);
+      const paidOrder = await ordersService.markPaidViaWebhook(webhookData.orderCode, webhookData.amount);
+      // `null` means this delivery didn't actually change anything (already
+      // paid, amount mismatch, unknown order) — stay quiet rather than
+      // re-notifying on every payOS retry of the same webhook.
+      if (paidOrder) {
+        const title = "Thanh toán thành công";
+        const body = `${paidOrder.customerName} đã thanh toán ${formatVnd(paidOrder.total)} qua QR`;
+        const url = `/orders/${paidOrder.id}`;
+        // Best-effort, independent of each other and of the webhook's own
+        // success — a push/notification failure must not make payOS think
+        // the webhook itself failed and retry it.
+        await notificationsService.create({ title, body, url }).catch((err) => {
+          console.error("[POST /api/webhooks/payos] failed to create notification", err);
+        });
+        await pushService.sendToAll({ title, body, url }).catch((err) => {
+          console.error("[POST /api/webhooks/payos] failed to send push", err);
+        });
+      }
     } catch (err) {
       console.error("[POST /api/webhooks/payos] failed to mark order paid", err);
     }

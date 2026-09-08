@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useApiGet, apiMutate } from "@/lib/use-api";
 import { BellIcon } from "@/components/icons";
 import { Sheet } from "@/components/sheet";
@@ -43,16 +44,27 @@ export function NotificationBell() {
           {(notifications ?? []).length === 0 && (
             <p className="py-6 text-center text-sm text-muted">Chưa có thông báo nào.</p>
           )}
-          {(notifications ?? []).map((n) => (
-            <div
-              key={n.id}
-              className={`rounded-xl border border-line px-3.5 py-3 ${n.read ? "bg-white" : "bg-primary-tint"}`}
-            >
-              <div className="text-[13px] font-semibold">{n.title}</div>
-              <div className="mt-0.5 text-[13px] text-muted">{n.body}</div>
-              <div className="mt-1 text-[11px] text-muted">{formatOrderTime(n.createdAt)}</div>
-            </div>
-          ))}
+          {(notifications ?? []).map((n) => {
+            const itemClassName = `rounded-xl border border-line px-3.5 py-3 ${
+              n.read ? "bg-white" : "bg-primary-tint"
+            }`;
+            const content = (
+              <>
+                <div className="text-[13px] font-semibold">{n.title}</div>
+                <div className="mt-0.5 text-[13px] text-muted">{n.body}</div>
+                <div className="mt-1 text-[11px] text-muted">{formatOrderTime(n.createdAt)}</div>
+              </>
+            );
+            return n.url ? (
+              <Link key={n.id} href={n.url} onClick={() => setOpen(false)} className={itemClassName}>
+                {content}
+              </Link>
+            ) : (
+              <div key={n.id} className={itemClassName}>
+                {content}
+              </div>
+            );
+          })}
         </div>
       </Sheet>
     </>

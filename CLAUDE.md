@@ -194,6 +194,17 @@ image tooling is installed) if the source logo changes:
   orders' `payment_status` to `'paid'` — implemented in
   `customersService.collectDebt()`, called from
   `POST /api/customers/[id]/collect-debt` — not decrementing a counter.
+  `ordersService.markPaid()` (`POST /api/orders/[id]/pay`,
+  `<CollectOrderPayment>` in `src/components/collect-order-payment.tsx`) is
+  the per-order counterpart — settles just *one* debt order instead of
+  every debt order a customer has. Only valid for `fulfillment_status =
+  "done"` and `payment_status = "debt"` (checked server-side); shows up as
+  a "Thanh toán đơn hàng" button on both the `/orders` list row and
+  `/orders/[id]` detail page wherever that combination holds, same
+  row/page `variant` + preventDefault-in-a-Link pattern as
+  `<OrderStatusActions>`. Sets `payment_method = "cash"`, same assumption
+  `deliver(id, true)` makes ("the shop just collected it in person");
+  doesn't touch `fulfillment_status`, which is already `"done"` here.
 - A walk-in customer ("Khách lẻ") is a real row in `customers`
   (`WALKIN_CUSTOMER_ID` in `types.ts`), not a null `customer_id`, so every
   order always has a customer to join against. Unlike the design prototype
@@ -214,7 +225,28 @@ image tooling is installed) if the source logo changes:
   navigation between `/sale` and `/checkout` — but a hard refresh loses it.
   If that becomes a real problem, persist it (localStorage or a
   `draft_orders` table) rather than reaching for a state library; don't
-  duplicate cart logic per-screen.
+  duplicate cart logic per-screen. `CartProvider` also owns the checkout
+  *draft* fields (`customerId`, `fee`, `topping`, `discount`,
+  `discountType`) for the same reason as the items themselves: `/checkout`'s
+  "+ Thêm sản phẩm" button navigates to `/sale` and back, remounting
+  `/checkout` fresh each time, so anything kept as local `useState` inside
+  that page (as these fields originally were) got silently wiped by that
+  round trip. `clear()` resets all of them together, called once after a
+  successful `POST /api/orders` in `handleSave()`.
+- `<CustomerPicker>` (`src/components/customer-picker.tsx`) is the shared
+  "chọn khách hàng" sheet for checkout and order-edit — a client-side
+  search box over the already-loaded customer list (no extra API call) plus
+  an "+ Thêm khách mới" toggle that only reveals the add-customer mini-form
+  when tapped, rather than always showing it above the list.
+- `<ProductPicker>` (`src/components/product-picker.tsx`) is
+  `/orders/[id]/edit`'s "Thêm sản phẩm" sheet — same shape as
+  `<CustomerPicker>`: a search box over the already-loaded product list,
+  with the category chips (a quick filter, same tabs as `/products`) only
+  shown while the search box is empty. Only used by order-edit — `/sale`'s
+  own product browsing is a full-page category grid, a different enough UX
+  (visual tiles vs. a searchable list) that it wasn't worth forcing onto
+  this component too. Selecting a product doesn't close the sheet, so the
+  cashier can add several in a row.
 - `ordersService.create()` recomputes totals server-side via `calcTotals()`
   from the raw cart/fee/discount — never trust a client-submitted total.
   It's also **not transactional**: it inserts the order then its
@@ -286,7 +318,7 @@ image tooling is installed) if the source logo changes:
 - Order lifecycle mutations (`ordersService.cancel()` /
   `ordersService.deliver()`, exposed as `POST /api/orders/[id]/cancel` and
   `POST /api/orders/[id]/deliver`) and their confirm sheets are one shared
-  component, `<OrderStatusActions orderId onChanged variant="row"|"page">`
+  component, `<OrderStatusActions orderId paymentStatus onChanged variant="row"|"page">`
   (`src/components/order-status-actions.tsx`), used on both the `/orders`
   list rows and the `/orders/[id]` detail page — don't reimplement
   cancel/deliver UI a third time, extend that component. `deliver()` looks
@@ -295,7 +327,18 @@ image tooling is installed) if the source logo changes:
   `customer_debts` directly (that view derives from `payment_status`, see
   below). `onChanged` is the caller's `refetch` — always pass one, and see
   the loading-gate gotcha above for why the receiving page must not gate its
-  skeleton on raw `loading`.
+  skeleton on raw `loading`. `paymentStatus === "paid"` here can only mean
+  "paid online via payOS before the shop delivered" (see
+  `markPaidViaWebhook()` — there's no other path to `payment_status =
+  "paid"` while `fulfillment_status` is still pending/processing), and
+  `<OrderStatusActions>` treats that as a distinct state: the "Hủy đơn"
+  button is hidden entirely (the money's already been received; this app
+  has no refund flow, so `ordersService.cancel()` also rejects it
+  server-side even if a client somehow calls the route directly), and "Đã
+  giao" skips the paid-vs-pay-later choice — `ordersService.deliver()`
+  ignores the `paid` argument when the order is already paid and only
+  flips `fulfillment_status` to `"done"`, leaving `payment_method` as
+  `"qr"` rather than stomping it back to `"cash"`.
 - `/orders` and `/report` read their filters (`status`/`time`/`pay`,
   `period`) from **URL search params** via `useSearchParams()` (wrapped in
   `<Suspense>`), not client state — every filter chip/tab is a plain
@@ -450,7 +493,21 @@ implementation here is a payment-integrity bug, not a cosmetic one.
   touches `payment_status`/`payment_method` (→ `"paid"`/`"qr"`), never
   `fulfillment_status` — a customer can pay the QR before the shop has
   fulfilled the order, so payment and fulfillment are independent here,
-  unlike `deliver()` where they change together.
+  unlike `deliver()` where they change together. `markPaidViaWebhook()`
+  returns `null` for every no-op case (already paid, amount mismatch,
+  unknown order) and `{ id, total, customerName }` only when it actually
+  just flipped the order to paid — the webhook route uses that to fire a
+  "Thanh toán thành công" notification (both `notificationsService.create()`
+  for the header-bell feed and `pushService.sendToAll()` for OS-level push,
+  both best-effort/independent of each other and of the webhook's own
+  success) exactly once per real payment, not once per payOS retry.
+  `NotificationDTO.url` (here `/orders/{id}`) is what `<NotificationBell>`
+  (`src/components/notification-bell.tsx`) renders each item as — a `<Link>`
+  when `url` is set, a plain `<div>` otherwise; tapping one closes the sheet
+  and navigates there. The OS-level push side of the same click already
+  worked before this (`public/sw.js`'s `notificationclick` handler opens/
+  focuses `payload.url`); the bell's in-app list was the only part not
+  wired up yet.
 - **Webhook registration** is a one-time setup step, not something the app
   does automatically per-request: run
   `node --env-file=.env.local scripts/register-payos-webhook.mjs` once
@@ -472,3 +529,24 @@ implementation here is a payment-integrity bug, not a cosmetic one.
   supply outside of an `INSERT`). This whole regeneration step is
   best-effort like `create()`'s original QR — a payOS failure here logs and
   moves on rather than blocking the edit.
+- **Sharing a receipt**: the share icon on `/orders/[id]` renders
+  `<ReceiptTemplate order>` (`src/components/receipt-template.tsx` — a
+  plain black-on-white printable-looking layout, deliberately not styled
+  like the rest of the app) off-screen (`position: fixed; left: -9999px`,
+  never shown directly), snapshots it to a PNG via `html2canvas-pro`
+  (dynamically imported inside the click handler so it never lands in the
+  main bundle), and hands that to `navigator.share({ files })` so the OS
+  share sheet offers Zalo/Messenger/etc. — falls back to opening the image
+  in a new tab when `navigator.canShare({ files })` is false (desktop
+  browsers mostly). **Uses the `-pro` fork, not plain `html2canvas`**: the
+  latter can't parse the `oklch()`/`lab()` color functions Tailwind v4's
+  default palette (`bg-white`, `text-neutral-500`, etc.) resolves to via
+  `getComputedStyle()`, and throws mid-snapshot on every capture — the
+  fork adds that support with an otherwise identical API. The receipt
+  reuses `<QrCode>` itself (shown whenever `payos_qr_code` exists and
+  `payment_status !== "paid"`, same condition as the page's own QR
+  section) — html2canvas captures a live `<canvas>` element's pixels
+  directly, so no special-casing was needed there. There's no stored shop
+  address to print in the header (unlike the reference receipt image this
+  was modeled on), so it only prints "Tara Shop" — revisit if a
+  configurable shop address/name ever gets added.

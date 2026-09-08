@@ -53,3 +53,21 @@ export function formatOrderTime(iso: string, now = new Date()): string {
   }).format(date);
   return `${dayMonth}, ${time}`;
 }
+
+/** "01/08/26 13:19" — full absolute date/time in shop-local (VN) time, for receipts. */
+export function formatReceiptDateTime(iso: string): string {
+  const date = new Date(iso);
+  const datePart = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: VN_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: VN_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+  return `${datePart} ${timePart}`;
+}

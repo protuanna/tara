@@ -6,13 +6,13 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { useApiGet, apiMutate } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
-import { calcTotals, type DiscountType } from "@/lib/pricing";
+import { calcTotals } from "@/lib/pricing";
 import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
-import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { FeePicker } from "@/components/fee-picker";
 import { ToppingPicker } from "@/components/topping-picker";
 import { DiscountPicker } from "@/components/discount-picker";
+import { CustomerPicker } from "@/components/customer-picker";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
 type Customer = { id: string; name: string; phone: string | null };
@@ -29,18 +29,21 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
   const router = useRouter();
   const cart = useCart();
 
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [customerId, setCustomerId] = useState(WALKIN_CUSTOMER_ID);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [addingCustomer, setAddingCustomer] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [addCustomerError, setAddCustomerError] = useState<string | null>(null);
+  const {
+    customerId,
+    setCustomerId,
+    fee,
+    setFee,
+    topping,
+    setTopping,
+    discount,
+    setDiscount,
+    discountType,
+    setDiscountType,
+  } = cart;
 
-  const [fee, setFee] = useState("");
-  const [topping, setTopping] = useState("");
-  const [discount, setDiscount] = useState("");
-  const [discountType, setDiscountType] = useState<DiscountType>("vnd");
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -77,25 +80,6 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
         </Link>
       </div>
     );
-  }
-
-  async function handleAddCustomer() {
-    setAddCustomerError(null);
-    setAddingCustomer(true);
-    const result = await apiMutate<Customer>("/api/customers", "POST", {
-      name: newName,
-      phone: newPhone || null,
-    });
-    setAddingCustomer(false);
-    if ("error" in result) {
-      setAddCustomerError(result.error);
-      return;
-    }
-    setCustomers((prev) => [...prev, result.data]);
-    setCustomerId(result.data.id);
-    setNewName("");
-    setNewPhone("");
-    setPickerOpen(false);
   }
 
   async function handleSave() {
@@ -242,64 +226,14 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
         {saving ? "Đang lưu..." : `Lưu đơn → ${formatVnd(totals.total)}`}
       </button>
 
-      <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)}>
-        <div className="text-[15px] font-bold">Chọn khách hàng</div>
-
-        <div className="flex flex-col gap-2 rounded-[14px] border border-dashed border-primary-light p-3">
-          <div className="text-xs font-bold text-primary-dark">Thêm khách hàng mới</div>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Tên khách"
-            className="rounded-[10px] border border-line px-3 py-2 text-base"
-          />
-          <input
-            value={newPhone}
-            onChange={(e) => setNewPhone(e.target.value)}
-            inputMode="tel"
-            placeholder="Số điện thoại (không bắt buộc)"
-            className="rounded-[10px] border border-line px-3 py-2 text-base"
-          />
-          {addCustomerError && (
-            <p className="text-xs font-semibold text-unpaid">{addCustomerError}</p>
-          )}
-          <button
-            onClick={handleAddCustomer}
-            disabled={addingCustomer || !newName.trim()}
-            className="rounded-lg bg-primary py-2 text-xs font-bold text-white disabled:opacity-60"
-          >
-            {addingCustomer ? "Đang thêm..." : "Thêm khách hàng"}
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          {customers.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => {
-                setCustomerId(c.id);
-                setPickerOpen(false);
-              }}
-              className={`flex items-center gap-3 rounded-[14px] border p-3 text-left ${
-                c.id === customerId ? "border-primary bg-primary-tint" : "border-line bg-white"
-              }`}
-            >
-              <span className="flex size-[38px] flex-none items-center justify-center rounded-full bg-primary-tint text-[15px] font-extrabold text-primary-dark">
-                {c.name.trim()[0]}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[13.5px] font-bold">{c.name}</span>
-                <span className="text-[11.5px] text-muted">
-                  {c.id === WALKIN_CUSTOMER_ID ? "Không ghi sổ khách" : c.phone || "Chưa có SĐT"}
-                </span>
-              </span>
-              {c.id === customerId && (
-                <span className="flex-none text-[15px] font-extrabold text-primary-dark">✓</span>
-              )}
-            </button>
-          ))}
-        </div>
-      </Sheet>
+      <CustomerPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        customers={customers}
+        selectedId={customerId}
+        onSelect={setCustomerId}
+        onCustomerAdded={(c) => setCustomers((prev) => [...prev, c])}
+      />
     </div>
   );
 }

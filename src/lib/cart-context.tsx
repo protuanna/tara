@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import type { DiscountType } from "@/lib/pricing";
+import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
 
 export type CartItem = {
   productId: string;
@@ -18,6 +20,20 @@ type CartContextValue = {
   incItem: (productId: string) => void;
   decItem: (productId: string) => void;
   clear: () => void;
+  // Checkout draft fields — live here (not local state in /checkout) so
+  // they survive navigating away to /sale to add another product and back;
+  // /checkout is a fresh mount each time, but this provider, mounted once
+  // in the root layout, isn't.
+  customerId: string;
+  setCustomerId: (id: string) => void;
+  fee: string;
+  setFee: (v: string) => void;
+  topping: string;
+  setTopping: (v: string) => void;
+  discount: string;
+  setDiscount: (v: string) => void;
+  discountType: DiscountType;
+  setDiscountType: (t: DiscountType) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -31,6 +47,11 @@ const CartContext = createContext<CartContextValue | null>(null);
  */
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [customerId, setCustomerId] = useState(WALKIN_CUSTOMER_ID);
+  const [fee, setFee] = useState("");
+  const [topping, setTopping] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [discountType, setDiscountType] = useState<DiscountType>("vnd");
 
   const addItem: CartContextValue["addItem"] = (product) => {
     setItems((prev) => {
@@ -61,7 +82,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const clear = () => setItems([]);
+  const clear = () => {
+    setItems([]);
+    setCustomerId(WALKIN_CUSTOMER_ID);
+    setFee("");
+    setTopping("");
+    setDiscount("");
+    setDiscountType("vnd");
+  };
 
   const { itemCount, subtotal } = useMemo(
     () =>
@@ -83,6 +111,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     incItem,
     decItem,
     clear,
+    customerId,
+    setCustomerId,
+    fee,
+    setFee,
+    topping,
+    setTopping,
+    discount,
+    setDiscount,
+    discountType,
+    setDiscountType,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

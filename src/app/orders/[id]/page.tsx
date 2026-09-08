@@ -1,20 +1,24 @@
 "use client";
 
-import { use } from "react";
+import { use, useRef, useState } from "react";
 import Link from "next/link";
 import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
 import { formatOrderTime } from "@/lib/date";
 import { FULFILLMENT_LABEL, PAYMENT_LABEL } from "@/lib/order-labels";
 import { OrderStatusActions } from "@/components/order-status-actions";
-import { PencilIcon } from "@/components/icons";
+import { CollectOrderPayment } from "@/components/collect-order-payment";
+import { PencilIcon, ShareIcon } from "@/components/icons";
 import { QrCode } from "@/components/qr-code";
+import { ReceiptTemplate } from "@/components/receipt-template";
 import { Skeleton } from "@/components/skeleton";
 import type { OrderDetailDTO } from "@/lib/services/ordersService";
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: order, loading, error, refetch } = useApiGet<OrderDetailDTO>(`/api/orders/${id}`);
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
 
   // Gate on `!order`, not `loading` — refetch() (after cancel/deliver) flips
   // loading back to true while the old order is still valid; re-showing the
@@ -38,6 +42,38 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const canDeliver =
     order.fulfillment_status === "pending" || order.fulfillment_status === "processing";
 
+  async function handleShare() {
+    if (!order || !receiptRef.current) return;
+    setSharing(true);
+    try {
+      // The plain "html2canvas" package can't parse the CSS color
+      // functions (oklch/lab) Tailwind v4's default palette generates —
+      // this fork adds that support with the same API, otherwise every
+      // snapshot throws mid-parse.
+      const { default: html2canvas } = await import("html2canvas-pro");
+      const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: "#ffffff" });
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) return;
+
+      const file = new File([blob], `hoa-don-${order.id.slice(0, 8)}.png`, { type: "image/png" });
+      if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Hóa đơn", text: "Tara Shop" });
+      } else {
+        // Browser doesn't support sharing files (mostly desktop) — open the
+        // image in a new tab so the cashier can save/share it manually.
+        window.open(URL.createObjectURL(blob), "_blank");
+      }
+    } catch (err) {
+      // AbortError = the user closed the native share sheet without
+      // picking anything — not a real failure, don't log/alert for it.
+      if (err instanceof Error && err.name !== "AbortError") {
+        console.error("[handleShare]", err);
+      }
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-3">
       <div className="flex items-center gap-2.5">
@@ -49,6 +85,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           ‹
         </Link>
         <div className="flex-1 text-base font-extrabold">Chi tiết đơn</div>
+        <button
+          type="button"
+          onClick={handleShare}
+          disabled={sharing}
+          aria-label="Chia sẻ hóa đơn"
+          className="flex size-[34px] flex-none items-center justify-center rounded-[11px] border border-line bg-white text-primary-dark disabled:opacity-60"
+        >
+          <ShareIcon className="size-[17px]" />
+        </button>
         {canDeliver && (
           <Link
             href={`/orders/${order.id}/edit`}
@@ -58,6 +103,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <PencilIcon className="size-[17px]" />
           </Link>
         )}
+      </div>
+
+      {/* Off-screen — html2canvas needs this actually laid out/painted, but
+          it's never meant to be seen; only the PNG snapshot of it is
+          shared. */}
+      <div className="fixed left-[-9999px] top-0" aria-hidden="true">
+        <div ref={receiptRef}>
+          <ReceiptTemplate order={order} />
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4">
@@ -137,7 +191,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {canDeliver ? (
-        <OrderStatusActions orderId={order.id} onChanged={refetch} variant="page" />
+        <OrderStatusActions
+          orderId={order.id}
+          paymentStatus={order.payment_status}
+          onChanged={refetch}
+          variant="page"
+        />
+      ) : order.fulfillment_status === "done" && order.payment_status === "debt" ? (
+        <CollectOrderPayment
+          orderId={order.id}
+          total={order.total}
+          onChanged={refetch}
+          variant="page"
+        />
       ) : order.fulfillment_status === "done" ? (
         <div className="rounded-2xl bg-primary-tint p-3.5 text-center text-[13px] font-semibold text-primary-dark">
           Đơn đã giao xong

@@ -7,11 +7,12 @@ import { useApiGet, apiMutate } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
 import { calcTotals, type DiscountType } from "@/lib/pricing";
 import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
-import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { FeePicker } from "@/components/fee-picker";
 import { ToppingPicker } from "@/components/topping-picker";
 import { DiscountPicker } from "@/components/discount-picker";
+import { CustomerPicker } from "@/components/customer-picker";
+import { ProductPicker } from "@/components/product-picker";
 import type { OrderDetailDTO } from "@/lib/services/ordersService";
 import type { CustomerDTO } from "@/lib/services/customersService";
 import type { CategoryDTO } from "@/lib/services/categoriesService";
@@ -102,13 +103,8 @@ function EditOrderScreen({
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [customerId, setCustomerId] = useState(order.customer_id);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [addingCustomer, setAddingCustomer] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [addCustomerError, setAddCustomerError] = useState<string | null>(null);
 
   const [productPickerOpen, setProductPickerOpen] = useState(false);
-  const [pickerCategoryId, setPickerCategoryId] = useState<string | null>(categories[0]?.id ?? null);
 
   const [fee, setFee] = useState(order.fee > 0 ? String(order.fee) : "");
   const [topping, setTopping] = useState(order.topping_fee > 0 ? String(order.topping_fee) : "");
@@ -128,11 +124,6 @@ function EditOrderScreen({
   const selectedCustomer =
     customers.find((c) => c.id === customerId) ?? { id: WALKIN_CUSTOMER_ID, name: "Khách lẻ", phone: null };
 
-  const filteredPickerProducts = useMemo(
-    () => products.filter((p) => p.category_id === pickerCategoryId),
-    [products, pickerCategoryId],
-  );
-
   function incItem(key: string) {
     setItems((prev) => prev.map((i) => (i.key === key ? { ...i, qty: i.qty + 1 } : i)));
   }
@@ -150,25 +141,6 @@ function EditOrderScreen({
         { key: product.id, productId: product.id, name: product.name, price: product.price, qty: 1 },
       ];
     });
-  }
-
-  async function handleAddCustomer() {
-    setAddCustomerError(null);
-    setAddingCustomer(true);
-    const result = await apiMutate<Customer>("/api/customers", "POST", {
-      name: newName,
-      phone: newPhone || null,
-    });
-    setAddingCustomer(false);
-    if ("error" in result) {
-      setAddCustomerError(result.error);
-      return;
-    }
-    setCustomers((prev) => [...prev, result.data]);
-    setCustomerId(result.data.id);
-    setNewName("");
-    setNewPhone("");
-    setPickerOpen(false);
   }
 
   async function handleSave() {
@@ -316,99 +288,22 @@ function EditOrderScreen({
         {saving ? "Đang lưu..." : `Lưu thay đổi → ${formatVnd(totals.total)}`}
       </button>
 
-      <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)}>
-        <div className="text-[15px] font-bold">Chọn khách hàng</div>
+      <CustomerPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        customers={customers}
+        selectedId={customerId}
+        onSelect={setCustomerId}
+        onCustomerAdded={(c) => setCustomers((prev) => [...prev, c])}
+      />
 
-        <div className="flex flex-col gap-2 rounded-[14px] border border-dashed border-primary-light p-3">
-          <div className="text-xs font-bold text-primary-dark">Thêm khách hàng mới</div>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Tên khách"
-            className="rounded-[10px] border border-line px-3 py-2 text-base"
-          />
-          <input
-            value={newPhone}
-            onChange={(e) => setNewPhone(e.target.value)}
-            inputMode="tel"
-            placeholder="Số điện thoại (không bắt buộc)"
-            className="rounded-[10px] border border-line px-3 py-2 text-base"
-          />
-          {addCustomerError && <p className="text-xs font-semibold text-unpaid">{addCustomerError}</p>}
-          <button
-            onClick={handleAddCustomer}
-            disabled={addingCustomer || !newName.trim()}
-            className="rounded-lg bg-primary py-2 text-xs font-bold text-white disabled:opacity-60"
-          >
-            {addingCustomer ? "Đang thêm..." : "Thêm khách hàng"}
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          {customers.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => {
-                setCustomerId(c.id);
-                setPickerOpen(false);
-              }}
-              className={`flex items-center gap-3 rounded-[14px] border p-3 text-left ${
-                c.id === customerId ? "border-primary bg-primary-tint" : "border-line bg-white"
-              }`}
-            >
-              <span className="flex size-[38px] flex-none items-center justify-center rounded-full bg-primary-tint text-[15px] font-extrabold text-primary-dark">
-                {c.name.trim()[0]}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[13.5px] font-bold">{c.name}</span>
-                <span className="text-[11.5px] text-muted">
-                  {c.id === WALKIN_CUSTOMER_ID ? "Không ghi sổ khách" : c.phone || "Chưa có SĐT"}
-                </span>
-              </span>
-              {c.id === customerId && <span className="flex-none text-[15px] font-extrabold text-primary-dark">✓</span>}
-            </button>
-          ))}
-        </div>
-      </Sheet>
-
-      <Sheet open={productPickerOpen} onClose={() => setProductPickerOpen(false)}>
-        <div className="text-[15px] font-bold">Thêm sản phẩm</div>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setPickerCategoryId(cat.id)}
-              className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
-                cat.id === pickerCategoryId ? "bg-primary text-white" : "border border-line bg-white text-ink"
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-col gap-2">
-          {filteredPickerProducts.map((product) => (
-            <button
-              key={product.id}
-              onClick={() => addProduct(product)}
-              className="flex items-center justify-between gap-2.5 rounded-[14px] border border-line p-3 text-left"
-            >
-              <span className="text-[13px] font-semibold">{product.name}</span>
-              <span className="flex items-center gap-2">
-                <span className="text-[13px] font-bold text-primary-dark">{formatVnd(product.price)}</span>
-                <span className="flex size-7 flex-none items-center justify-center rounded-lg bg-primary-tint text-lg font-extrabold leading-none text-primary-dark">
-                  +
-                </span>
-              </span>
-            </button>
-          ))}
-          {filteredPickerProducts.length === 0 && (
-            <div className="rounded-xl bg-page p-3 text-center text-xs text-muted">
-              Danh mục này chưa có sản phẩm.
-            </div>
-          )}
-        </div>
-      </Sheet>
+      <ProductPicker
+        open={productPickerOpen}
+        onClose={() => setProductPickerOpen(false)}
+        categories={categories}
+        products={products}
+        onSelect={addProduct}
+      />
     </div>
   );
 }

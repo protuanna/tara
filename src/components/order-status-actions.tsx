@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sheet } from "@/components/sheet";
 import { apiMutate } from "@/lib/use-api";
+import type { PaymentStatus } from "@/lib/supabase/types";
 
 /**
  * Cancel / mark-delivered controls for an order that's still
@@ -13,13 +14,23 @@ import { apiMutate } from "@/lib/use-api";
  * sheets are identical. Calls `router.refresh()` after a successful
  * mutation — harmless no-op for these client-fetched pages, kept in case a
  * server-rendered ancestor ever needs to revalidate too.
+ *
+ * `paymentStatus === "paid"` here only ever means "paid online via payOS
+ * before the shop delivered" (see `ordersService.markPaidViaWebhook()`) —
+ * there's no other way to reach `payment_status = "paid"` while
+ * `fulfillment_status` is still pending/processing. In that state:
+ * cancelling is hidden entirely (the money's already been received, this
+ * app has no refund flow), and "Đã giao" skips the paid-or-not choice —
+ * there's nothing left to ask, it's already paid.
  */
 export function OrderStatusActions({
   orderId,
+  paymentStatus,
   onChanged,
   variant,
 }: {
   orderId: string;
+  paymentStatus: PaymentStatus;
   onChanged: () => void;
   variant: "row" | "page";
 }) {
@@ -27,6 +38,8 @@ export function OrderStatusActions({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [pending, setPending] = useState(false);
+
+  const alreadyPaid = paymentStatus === "paid";
 
   async function handleCancel() {
     setPending(true);
@@ -65,12 +78,14 @@ export function OrderStatusActions({
     // portal, so its clicks still bubble through this DOM subtree).
     <div onClick={(e) => e.preventDefault()}>
       <div className="flex gap-2">
-        <button
-          onClick={() => setCancelOpen(true)}
-          className={`${buttonClass} bg-[#F1F0F3] text-unpaid`}
-        >
-          Hủy đơn
-        </button>
+        {!alreadyPaid && (
+          <button
+            onClick={() => setCancelOpen(true)}
+            className={`${buttonClass} bg-[#F1F0F3] text-unpaid`}
+          >
+            Hủy đơn
+          </button>
+        )}
         <button
           onClick={() => setDeliverOpen(true)}
           className={`${buttonClass} bg-primary text-white`}
@@ -79,42 +94,62 @@ export function OrderStatusActions({
         </button>
       </div>
 
-      <Sheet open={cancelOpen} onClose={() => setCancelOpen(false)}>
-        <div className="text-[15px] font-bold">Hủy đơn này?</div>
-        <p className="text-[13px] leading-relaxed text-muted">
-          Đơn sẽ chuyển sang trạng thái đã hủy và không tính vào doanh thu.
-        </p>
-        <button
-          onClick={handleCancel}
-          disabled={pending}
-          className="rounded-xl bg-unpaid py-3.5 text-sm font-bold text-white disabled:opacity-60"
-        >
-          Hủy đơn
-        </button>
-        <button
-          onClick={() => setCancelOpen(false)}
-          className="rounded-xl border border-line py-3.5 text-sm font-semibold text-ink"
-        >
-          Giữ đơn
-        </button>
-      </Sheet>
+      {!alreadyPaid && (
+        <Sheet open={cancelOpen} onClose={() => setCancelOpen(false)}>
+          <div className="text-[15px] font-bold">Hủy đơn này?</div>
+          <p className="text-[13px] leading-relaxed text-muted">
+            Đơn sẽ chuyển sang trạng thái đã hủy và không tính vào doanh thu.
+          </p>
+          <button
+            onClick={handleCancel}
+            disabled={pending}
+            className="rounded-xl bg-unpaid py-3.5 text-sm font-bold text-white disabled:opacity-60"
+          >
+            Hủy đơn
+          </button>
+          <button
+            onClick={() => setCancelOpen(false)}
+            className="rounded-xl border border-line py-3.5 text-sm font-semibold text-ink"
+          >
+            Giữ đơn
+          </button>
+        </Sheet>
+      )}
 
       <Sheet open={deliverOpen} onClose={() => setDeliverOpen(false)}>
-        <div className="text-[15px] font-bold">Đơn đã giao — tiền thì sao?</div>
-        <button
-          onClick={() => handleDeliver(true)}
-          disabled={pending}
-          className="rounded-xl bg-primary py-3.5 text-sm font-bold text-white disabled:opacity-60"
-        >
-          Đã thanh toán
-        </button>
-        <button
-          onClick={() => handleDeliver(false)}
-          disabled={pending}
-          className="rounded-xl border border-line py-3.5 text-sm font-bold text-ink disabled:opacity-60"
-        >
-          Thanh toán sau
-        </button>
+        {alreadyPaid ? (
+          <>
+            <div className="text-[15px] font-bold">Xác nhận đơn đã giao?</div>
+            <p className="text-[13px] leading-relaxed text-muted">
+              Đơn này đã được thanh toán online qua QR.
+            </p>
+            <button
+              onClick={() => handleDeliver(true)}
+              disabled={pending}
+              className="rounded-xl bg-primary py-3.5 text-sm font-bold text-white disabled:opacity-60"
+            >
+              Xác nhận đã giao
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="text-[15px] font-bold">Đơn đã giao — tiền thì sao?</div>
+            <button
+              onClick={() => handleDeliver(true)}
+              disabled={pending}
+              className="rounded-xl bg-primary py-3.5 text-sm font-bold text-white disabled:opacity-60"
+            >
+              Đã thanh toán
+            </button>
+            <button
+              onClick={() => handleDeliver(false)}
+              disabled={pending}
+              className="rounded-xl border border-line py-3.5 text-sm font-bold text-ink disabled:opacity-60"
+            >
+              Thanh toán sau
+            </button>
+          </>
+        )}
       </Sheet>
     </div>
   );
