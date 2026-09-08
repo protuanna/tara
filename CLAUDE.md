@@ -279,7 +279,7 @@ image tooling is installed) if the source logo changes:
   freshly-added line), never by `product_id` itself, since a pre-existing
   line can have a null one.
 - Checkout and `/orders/[id]/edit` both show three surcharge/discount
-  controls in the same shape: `<FeePicker>` ("Phí vận chuyển": 5.000Đ /
+  controls in the same shape: `<FeePicker>` ("Phí vận chuyển": 0Đ / 5.000Đ /
   10.000Đ / 20.000Đ), `<ToppingPicker>` ("Topping": 0Đ / 10.000Đ), and
   `<DiscountPicker>` ("Giảm giá", VNĐ or %). The two preset pickers are thin
   wrappers around the shared `<AmountPicker label presets value onChange>`
