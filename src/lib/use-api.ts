@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { beginRefetch, endRefetch, announceResume } from "@/lib/refetch-indicator";
+import {
+  beginRefetch,
+  endRefetch,
+  announceResume,
+  markHidden,
+  wasHiddenLongEnough,
+} from "@/lib/refetch-indicator";
 
 type ApiSuccess<T> = { data: T };
 type ApiFailure = { error: string; message: string; statusCode: number };
@@ -31,18 +37,33 @@ export function useApiGet<T>(url: string | null, deps: unknown[] = []) {
   // until the new response lands, and every screen already gates its
   // skeleton on `!data` (see the CLAUDE.md loading-gate note), not on
   // `loading` alone.
+  //
+  // visibilitychange fires on every hide/show, not just a real app
+  // suspend/resume — a brief app switch to check a notification or
+  // unlocking the phone screen triggers the same event, so it's gated on
+  // having actually been hidden for a while (see wasHiddenLongEnough).
+  // pageshow (bfcache back/forward restore) has no comparable "how long
+  // was it gone" signal of its own, so it always refetches.
   useEffect(() => {
-    function handleResume() {
-      if (document.visibilityState === "visible") {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        markHidden();
+        return;
+      }
+      if (document.visibilityState === "visible" && wasHiddenLongEnough()) {
         announceResume();
         setReloadKey((k) => k + 1);
       }
     }
-    document.addEventListener("visibilitychange", handleResume);
-    window.addEventListener("pageshow", handleResume);
+    function handlePageShow() {
+      announceResume();
+      setReloadKey((k) => k + 1);
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
     return () => {
-      document.removeEventListener("visibilitychange", handleResume);
-      window.removeEventListener("pageshow", handleResume);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
     };
   }, []);
 

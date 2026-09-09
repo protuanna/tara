@@ -11,6 +11,23 @@ let activeCount = 0;
 const countListeners = new Set<CountListener>();
 const resumeListeners = new Set<ResumeListener>();
 
+// A quick app-switch (checking a notification, unlocking the screen) fires
+// the same visibilitychange transition as the real iOS-PWA-suspend case
+// this resume-refetch exists for, but doesn't need one — only refetch if
+// the page was actually hidden for a while.
+const RESUME_MIN_HIDDEN_MS = 20_000;
+let hiddenAt: number | null = null;
+
+/** Call when the page becomes hidden (see useApiGet's visibilitychange handler). */
+export function markHidden(): void {
+  hiddenAt = Date.now();
+}
+
+/** Whether the page was hidden long enough to be worth a resume-refetch. */
+export function wasHiddenLongEnough(): boolean {
+  return hiddenAt !== null && Date.now() - hiddenAt >= RESUME_MIN_HIDDEN_MS;
+}
+
 /** Call when a background revalidation (data already on screen) starts. */
 export function beginRefetch(): void {
   activeCount += 1;
