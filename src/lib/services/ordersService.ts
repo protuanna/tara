@@ -1,16 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { calcTotals, type DiscountType } from "@/lib/pricing";
-import { vnTodayStartIso, daysAgoIso } from "@/lib/date";
+import { vnTodayStartIso, daysAgoIso, vnDateStartIso, vnDateEndExclusiveIso } from "@/lib/date";
 import { payosService } from "./payosService";
 import type { FulfillmentStatus, PaymentStatus, PaymentMethod } from "@/lib/supabase/types";
 
 export type StatusFilter = "all" | FulfillmentStatus;
-export type TimeFilter = "all" | "today" | "7d" | "30d";
+export type TimeFilter = "all" | "today" | "7d" | "30d" | "custom";
 export type PayFilter = "all" | PaymentStatus;
 
 const STATUS_VALUES: FulfillmentStatus[] = ["pending", "processing", "done", "cancel"];
 const PAY_VALUES: PaymentStatus[] = ["paid", "debt", "unpaid"];
-const TIME_VALUES: TimeFilter[] = ["today", "7d", "30d"];
+const TIME_VALUES: TimeFilter[] = ["today", "7d", "30d", "custom"];
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseStatusFilter(v: string | null): StatusFilter {
   return v && STATUS_VALUES.includes(v as FulfillmentStatus) ? (v as FulfillmentStatus) : "all";
@@ -58,6 +59,9 @@ export const ordersService = {
     status: StatusFilter;
     time: TimeFilter;
     pay: PayFilter;
+    from?: string;
+    to?: string;
+    customerId?: string;
   }): Promise<{ orders: OrderListRow[]; statusCounts: StatusCounts }> {
     const supabase = await createClient();
 
@@ -70,9 +74,18 @@ export const ordersService = {
 
     if (filters.status !== "all") query = query.eq("fulfillment_status", filters.status);
     if (filters.pay !== "all") query = query.eq("payment_status", filters.pay);
+    if (filters.customerId) query = query.eq("customer_id", filters.customerId);
     if (filters.time === "today") query = query.gte("created_at", vnTodayStartIso());
     else if (filters.time === "7d") query = query.gte("created_at", daysAgoIso(7));
     else if (filters.time === "30d") query = query.gte("created_at", daysAgoIso(30));
+    else if (filters.time === "custom") {
+      if (filters.from && DATE_KEY_RE.test(filters.from)) {
+        query = query.gte("created_at", vnDateStartIso(filters.from));
+      }
+      if (filters.to && DATE_KEY_RE.test(filters.to)) {
+        query = query.lt("created_at", vnDateEndExclusiveIso(filters.to));
+      }
+    }
 
     const [{ data: orders, error: ordersErr }, { data: allStatuses, error: statusErr }] =
       await Promise.all([

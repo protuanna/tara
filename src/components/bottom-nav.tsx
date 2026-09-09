@@ -37,7 +37,7 @@ export function BottomNav() {
     <div className="flex flex-none items-center justify-around border-t border-line bg-white px-1 pb-3.5 pt-2">
       {NAV_ITEMS.map(({ href, label, Icon }) => item(href, label, Icon))}
 
-      <Link href="/sale" className="-mt-[22px] flex flex-col items-center gap-0.5">
+      <Link href="/sale" className="relative z-20 -mt-[22px] flex flex-col items-center gap-0.5">
         <span className="flex size-[52px] items-center justify-center rounded-full border-2 border-primary bg-white text-[26px] font-extrabold text-primary-dark shadow-lg">
           +
         </span>

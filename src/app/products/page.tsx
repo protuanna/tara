@@ -53,6 +53,7 @@ function ProductsScreen({
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ProductDTO | null>(null);
 
   // "Tất cả" (null) shows every group; a real category id filters to just
   // that one; the "uncategorized" sentinel filters to the defensive
@@ -125,11 +126,12 @@ function ProductsScreen({
     onCategoriesChanged();
   }
 
-  async function handleDelete(product: ProductDTO) {
-    if (!window.confirm(`Xóa "${product.name}"?`)) return;
-    setDeletingId(product.id);
-    await apiMutate(`/api/products/${product.id}`, "DELETE");
+  async function handleConfirmDelete() {
+    if (!confirmDelete) return;
+    setDeletingId(confirmDelete.id);
+    await apiMutate(`/api/products/${confirmDelete.id}`, "DELETE");
     setDeletingId(null);
+    setConfirmDelete(null);
     onProductsChanged();
   }
 
@@ -138,7 +140,7 @@ function ProductsScreen({
       <div className="flex gap-2.5">
         <button
           onClick={() => openAddProduct(null)}
-          className="flex-1 rounded-xl bg-primary py-3.5 text-[13px] font-bold text-white"
+          className="flex h-[42px] flex-1 items-center justify-center rounded-xl bg-primary text-[13px] font-bold text-white"
         >
           + Thêm sản phẩm
         </button>
@@ -148,7 +150,7 @@ function ProductsScreen({
             setNewCategoryName("");
             setAddCategoryOpen(true);
           }}
-          className="flex-1 rounded-xl border border-line bg-white py-3.5 text-[13px] font-semibold text-ink"
+          className="flex h-[42px] flex-1 items-center justify-center rounded-xl border border-line bg-white text-[13px] font-semibold text-ink"
         >
           + Thêm danh mục
         </button>
@@ -236,7 +238,7 @@ function ProductsScreen({
                   </div>
                 </div>
                 <button
-                  onClick={() => handleDelete(product)}
+                  onClick={() => setConfirmDelete(product)}
                   disabled={deletingId === product.id}
                   className="rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-semibold text-unpaid disabled:opacity-60"
                 >
@@ -267,7 +269,7 @@ function ProductsScreen({
                   </div>
                 </div>
                 <button
-                  onClick={() => handleDelete(product)}
+                  onClick={() => setConfirmDelete(product)}
                   disabled={deletingId === product.id}
                   className="rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-semibold text-unpaid disabled:opacity-60"
                 >
@@ -344,6 +346,30 @@ function ProductsScreen({
         >
           {savingCategory ? "Đang lưu..." : "Lưu danh mục"}
         </button>
+      </Sheet>
+
+      <Sheet open={confirmDelete !== null} onClose={() => setConfirmDelete(null)}>
+        {confirmDelete && (
+          <>
+            <div className="text-[15px] font-bold">Xóa sản phẩm này?</div>
+            <p className="text-[13px] leading-relaxed text-muted">
+              &quot;{confirmDelete.name}&quot; sẽ bị xóa khỏi danh sách sản phẩm.
+            </p>
+            <button
+              onClick={handleConfirmDelete}
+              disabled={deletingId === confirmDelete.id}
+              className="rounded-xl bg-unpaid py-3.5 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {deletingId === confirmDelete.id ? "Đang xóa..." : "Xóa"}
+            </button>
+            <button
+              onClick={() => setConfirmDelete(null)}
+              className="rounded-xl border border-line py-3.5 text-sm font-semibold text-ink"
+            >
+              Giữ lại
+            </button>
+          </>
+        )}
       </Sheet>
     </div>
   );

@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { BottomNav } from "@/components/bottom-nav";
 import { ResumeToast } from "@/components/resume-toast";
 import { CartProvider } from "@/lib/cart-context";
+import { HeaderSearchProvider } from "@/lib/header-search-context";
 import "./globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -39,12 +40,14 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <CartProvider>
-          <ResumeToast />
-          <div className="mx-auto flex h-dvh max-w-[480px] flex-col overflow-hidden bg-surface shadow-xl">
-            <SiteHeader />
-            <div className="flex-1 overflow-y-auto">{children}</div>
-            <BottomNav />
-          </div>
+          <HeaderSearchProvider>
+            <ResumeToast />
+            <div className="mx-auto flex h-dvh max-w-[480px] flex-col overflow-hidden bg-surface shadow-xl">
+              <SiteHeader />
+              <div className="flex-1 overflow-y-auto">{children}</div>
+              <BottomNav />
+            </div>
+          </HeaderSearchProvider>
         </CartProvider>
       </body>
     </html>

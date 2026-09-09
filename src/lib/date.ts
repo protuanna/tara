@@ -19,6 +19,35 @@ export function daysAgoIso(days: number, now = new Date()): string {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
+/**
+ * Start-of-day (00:00) in Asia/Ho_Chi_Minh for a "YYYY-MM-DD" VN calendar
+ * date (e.g. from a `<input type="date">`), as an ISO instant — the lower
+ * bound for a custom date-range filter.
+ */
+export function vnDateStartIso(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const vnMidnightUtcMs = Date.UTC(y, m - 1, d) - VN_OFFSET_MINUTES * 60_000;
+  return new Date(vnMidnightUtcMs).toISOString();
+}
+
+/**
+ * Exclusive upper bound (00:00 of the *next* VN day) for a "YYYY-MM-DD"
+ * date — pairs with `vnDateStartIso()` so a custom range's "to" date is
+ * inclusive of that whole day.
+ */
+export function vnDateEndExclusiveIso(dateKey: string): string {
+  return new Date(new Date(vnDateStartIso(dateKey)).getTime() + 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** "01/09 - 09/09" from two "YYYY-MM-DD" date keys — a custom date-range filter chip's label. */
+export function formatDateRangeShort(from: string, to: string): string {
+  const short = (key: string) => {
+    const [, m, d] = key.split("-");
+    return `${d}/${m}`;
+  };
+  return `${short(from)} - ${short(to)}`;
+}
+
 const VN_TZ = "Asia/Ho_Chi_Minh";
 
 /** yyyy-mm-dd for `date` in Asia/Ho_Chi_Minh — for grouping rows by VN calendar day. */

@@ -13,19 +13,38 @@ import { FeePicker } from "@/components/fee-picker";
 import { ToppingPicker } from "@/components/topping-picker";
 import { DiscountPicker } from "@/components/discount-picker";
 import { CustomerPicker } from "@/components/customer-picker";
+import { ProductPicker } from "@/components/product-picker";
 import type { CustomerDTO } from "@/lib/services/customersService";
+import type { CategoryDTO } from "@/lib/services/categoriesService";
+import type { ProductDTO } from "@/lib/services/productsService";
 
 type Customer = { id: string; name: string; phone: string | null };
 
 export default function CheckoutPage() {
-  const { data: customers, loading } = useApiGet<CustomerDTO[]>("/api/customers");
+  const { data: customers, loading: loadingCustomers } = useApiGet<CustomerDTO[]>("/api/customers");
+  const { data: categories, loading: loadingCategories } = useApiGet<CategoryDTO[]>("/api/categories");
+  const { data: products, loading: loadingProducts } = useApiGet<ProductDTO[]>("/api/products");
 
-  if (loading) return <CheckoutSkeleton />;
+  if (loadingCustomers || loadingCategories || loadingProducts) return <CheckoutSkeleton />;
 
-  return <CheckoutScreen initialCustomers={customers ?? []} />;
+  return (
+    <CheckoutScreen
+      initialCustomers={customers ?? []}
+      categories={categories ?? []}
+      products={products ?? []}
+    />
+  );
 }
 
-function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) {
+function CheckoutScreen({
+  initialCustomers,
+  categories,
+  products,
+}: {
+  initialCustomers: Customer[];
+  categories: CategoryDTO[];
+  products: ProductDTO[];
+}) {
   const router = useRouter();
   const cart = useCart();
 
@@ -44,9 +63,16 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
 
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const productQtyById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of cart.items) map.set(item.productId, item.qty);
+    return map;
+  }, [cart.items]);
 
   const totals = useMemo(
     () =>
@@ -123,12 +149,12 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
       <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-3.5">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-bold">Sản phẩm trong đơn</div>
-          <Link
-            href="/sale"
+          <button
+            onClick={() => setProductPickerOpen(true)}
             className="rounded-full border border-line px-3 py-1.5 text-xs font-bold text-primary-dark"
           >
             + Thêm sản phẩm
-          </Link>
+          </button>
         </div>
         {cart.items.map((item) => (
           <div key={item.productId} className="flex items-center justify-between gap-2.5">
@@ -233,6 +259,16 @@ function CheckoutScreen({ initialCustomers }: { initialCustomers: Customer[] }) 
         selectedId={customerId}
         onSelect={setCustomerId}
         onCustomerAdded={(c) => setCustomers((prev) => [...prev, c])}
+      />
+
+      <ProductPicker
+        open={productPickerOpen}
+        onClose={() => setProductPickerOpen(false)}
+        categories={categories}
+        products={products}
+        quantities={productQtyById}
+        onInc={cart.addItem}
+        onDec={cart.decItem}
       />
     </div>
   );

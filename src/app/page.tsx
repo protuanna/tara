@@ -5,7 +5,7 @@ import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
 import { formatOrderTime } from "@/lib/date";
 import { QuickAction } from "@/components/quick-action";
-import { CartIcon, ReceiptIcon, BoxIcon, PeopleIcon } from "@/components/icons";
+import { CartIcon, ReceiptIcon, BoxIcon, PeopleIcon, WalletIcon } from "@/components/icons";
 import { Skeleton } from "@/components/skeleton";
 import type { DashboardDTO } from "@/lib/services/homeService";
 
@@ -37,7 +37,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5 rounded-[18px] border border-line bg-white px-2 py-4">
+      <div className="grid grid-cols-5 gap-1.5 rounded-[18px] border border-line bg-white px-2 py-4">
         <QuickAction href="/sale" label="Bán hàng" bg="bg-primary-tint" fg="text-primary-dark">
           <CartIcon width={23} height={23} />
         </QuickAction>
@@ -49,6 +49,9 @@ export default function HomePage() {
         </QuickAction>
         <QuickAction href="/customers" label="Khách hàng" bg="bg-[#FDECF3]" fg="text-[#B03A70]">
           <PeopleIcon width={23} height={23} />
+        </QuickAction>
+        <QuickAction href="/expenses" label="Chi" bg="bg-[#E9EEFF]" fg="text-[#3B5BDB]">
+          <WalletIcon width={23} height={23} />
         </QuickAction>
       </div>
 
@@ -104,8 +107,8 @@ function HomeSkeleton() {
         <Skeleton className="h-[64px] rounded-[14px]" />
         <Skeleton className="h-[64px] rounded-[14px]" />
       </div>
-      <div className="grid grid-cols-4 gap-1.5 rounded-[18px] border border-line bg-white px-2 py-4">
-        {Array.from({ length: 4 }, (_, i) => (
+      <div className="grid grid-cols-5 gap-1.5 rounded-[18px] border border-line bg-white px-2 py-4">
+        {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className="flex flex-col items-center gap-1.5">
             <Skeleton className="size-[46px] rounded-[15px]" />
             <Skeleton className="h-3 w-10 rounded" />

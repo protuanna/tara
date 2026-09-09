@@ -2,10 +2,10 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
-import { formatOrderTime } from "@/lib/date";
+import { formatOrderTime, vnDateKey, formatDateRangeShort } from "@/lib/date";
 import { FULFILLMENT_LABEL, PAYMENT_LABEL, PAYMENT_METHOD_LABEL } from "@/lib/order-labels";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
@@ -41,10 +41,20 @@ const PAY_CHIPS: { value: PayFilter; label: string }[] = [
   { value: "debt", label: "Đã ghi nợ" },
 ];
 
-function ordersUrl(next: { status: StatusFilter; time: TimeFilter; pay: PayFilter }): string {
+function ordersUrl(next: {
+  status: StatusFilter;
+  time: TimeFilter;
+  pay: PayFilter;
+  from?: string;
+  to?: string;
+}): string {
   const params = new URLSearchParams();
   if (next.status !== "all") params.set("status", next.status);
   if (next.time !== "all") params.set("time", next.time);
+  if (next.time === "custom") {
+    if (next.from) params.set("from", next.from);
+    if (next.to) params.set("to", next.to);
+  }
   if (next.pay !== "all") params.set("pay", next.pay);
   const qs = params.toString();
   return qs ? `/orders?${qs}` : "/orders";
@@ -62,15 +72,20 @@ export default function OrdersPage() {
 }
 
 function OrdersContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const activeStatus = (searchParams.get("status") as StatusFilter) || "all";
   const activeTime = (searchParams.get("time") as TimeFilter) || "all";
   const activePay = (searchParams.get("pay") as PayFilter) || "all";
+  const activeFrom = searchParams.get("from") ?? "";
+  const activeTo = searchParams.get("to") ?? "";
 
   const apiUrl = `/api/orders?${new URLSearchParams({
     ...(activeStatus !== "all" ? { status: activeStatus } : {}),
     ...(activeTime !== "all" ? { time: activeTime } : {}),
     ...(activePay !== "all" ? { pay: activePay } : {}),
+    ...(activeTime === "custom" && activeFrom ? { from: activeFrom } : {}),
+    ...(activeTime === "custom" && activeTo ? { to: activeTo } : {}),
   }).toString()}`;
 
   const { data, refetch } = useApiGet<{ orders: OrderListRow[]; statusCounts: StatusCounts }>(
@@ -78,6 +93,30 @@ function OrdersContent() {
   );
 
   const [filterOpen, setFilterOpen] = useState(false);
+  const today = vnDateKey(new Date());
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [fromInput, setFromInput] = useState(activeFrom || today);
+  const [toInput, setToInput] = useState(activeTo || today);
+
+  function openRangePicker() {
+    setFromInput(activeFrom || today);
+    setToInput(activeTo || today);
+    setRangeOpen(true);
+  }
+
+  function handleApplyRange() {
+    setRangeOpen(false);
+    setFilterOpen(false);
+    router.push(
+      ordersUrl({
+        status: activeStatus,
+        time: "custom",
+        pay: activePay,
+        from: fromInput,
+        to: toInput,
+      }),
+    );
+  }
 
   // Gate on `!data` alone, not `loading` — refetch() (after cancel/deliver)
   // flips loading back to true while old data is still valid, and we don't
@@ -210,6 +249,18 @@ function OrdersContent() {
                 {chip.label}
               </Link>
             ))}
+            <button
+              onClick={openRangePicker}
+              className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                activeTime === "custom"
+                  ? "border-primary bg-primary-tint text-primary-dark"
+                  : "border-line bg-white text-muted"
+              }`}
+            >
+              {activeTime === "custom" && activeFrom && activeTo
+                ? formatDateRangeShort(activeFrom, activeTo)
+                : "Tùy chọn"}
+            </button>
           </div>
         </div>
 
@@ -246,6 +297,37 @@ function OrdersContent() {
             Áp dụng
           </button>
         </div>
+      </Sheet>
+
+      <Sheet open={rangeOpen} onClose={() => setRangeOpen(false)}>
+        <div className="text-[15px] font-bold">Chọn khoảng thời gian</div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-muted">Từ ngày</label>
+          <input
+            type="date"
+            value={fromInput}
+            max={toInput}
+            onChange={(e) => setFromInput(e.target.value)}
+            className="rounded-[10px] border border-line px-3 py-3 text-base"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-muted">Đến ngày</label>
+          <input
+            type="date"
+            value={toInput}
+            min={fromInput}
+            onChange={(e) => setToInput(e.target.value)}
+            className="rounded-[10px] border border-line px-3 py-3 text-base"
+          />
+        </div>
+        <button
+          onClick={handleApplyRange}
+          disabled={!fromInput || !toInput}
+          className="rounded-xl bg-primary py-3.5 text-sm font-bold text-white disabled:opacity-60"
+        >
+          Áp dụng
+        </button>
       </Sheet>
     </div>
   );

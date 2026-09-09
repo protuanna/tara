@@ -2,6 +2,7 @@
 
 import { use, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
 import { formatOrderTime } from "@/lib/date";
@@ -16,6 +17,7 @@ import type { OrderDetailDTO } from "@/lib/services/ordersService";
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { data: order, loading, error, refetch } = useApiGet<OrderDetailDTO>(`/api/orders/${id}`);
   const receiptRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
@@ -77,13 +79,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-3">
       <div className="flex items-center gap-2.5">
-        <Link
-          href="/"
-          aria-label="Trang chủ"
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="Quay lại"
           className="flex size-[34px] flex-none items-center justify-center rounded-[11px] border border-line bg-white text-lg font-extrabold leading-none text-primary-dark"
         >
           ‹
-        </Link>
+        </button>
         <div className="flex-1 text-base font-extrabold">Chi tiết đơn</div>
         <button
           type="button"

@@ -143,6 +143,24 @@ function EditOrderScreen({
     });
   }
 
+  // Mirrors addProduct()'s productId-based lookup (not by line `key`) so
+  // the product-picker grid's "−" stepper works the same for a freshly
+  // added line (key === productId) and a pre-existing one (key === the
+  // order_item's own id).
+  function decProduct(productId: string) {
+    setItems((prev) =>
+      prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty - 1 } : i)).filter((i) => i.qty > 0),
+    );
+  }
+
+  const productQtyById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of items) {
+      if (item.productId) map.set(item.productId, (map.get(item.productId) ?? 0) + item.qty);
+    }
+    return map;
+  }, [items]);
+
   async function handleSave() {
     if (items.length === 0) {
       setSaveError("Giỏ hàng trống");
@@ -302,7 +320,9 @@ function EditOrderScreen({
         onClose={() => setProductPickerOpen(false)}
         categories={categories}
         products={products}
-        onSelect={addProduct}
+        quantities={productQtyById}
+        onInc={addProduct}
+        onDec={decProduct}
       />
     </div>
   );

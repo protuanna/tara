@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
       status: parseStatusFilter(sp.get("status")),
       time: parseTimeFilter(sp.get("time")),
       pay: parsePayFilter(sp.get("pay")),
+      from: sp.get("from") ?? undefined,
+      to: sp.get("to") ?? undefined,
+      customerId: sp.get("customerId") ?? undefined,
     });
     return NextResponse.json({ data: { orders, statusCounts } });
   } catch (err) {

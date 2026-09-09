@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useApiGet, apiMutate } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
+import { useHeaderSearch } from "@/lib/header-search-context";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
 export default function CustomersPage() {
@@ -33,6 +34,15 @@ function CustomersScreen({
 
   const [selected, setSelected] = useState<CustomerDTO | null>(null);
   const [collecting, setCollecting] = useState(false);
+
+  const { query } = useHeaderSearch();
+  const filteredCustomers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (c) => c.name.toLowerCase().includes(q) || (c.phone ?? "").includes(q),
+    );
+  }, [customers, query]);
 
   async function handleAdd() {
     setAddError(null);
@@ -79,7 +89,12 @@ function CustomersScreen({
         {customers.length === 0 && (
           <div className="p-8 text-center text-sm text-muted">Chưa có khách hàng nào.</div>
         )}
-        {customers.map((c) => (
+        {customers.length > 0 && filteredCustomers.length === 0 && (
+          <div className="p-8 text-center text-sm text-muted">
+            Không tìm thấy khách hàng khớp &quot;{query}&quot;.
+          </div>
+        )}
+        {filteredCustomers.map((c) => (
           <button
             key={c.id}
             onClick={() => setSelected(c)}

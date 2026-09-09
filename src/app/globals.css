@@ -85,3 +85,24 @@ input.header-search-input:focus {
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari/Edge */
 }
+
+/*
+ * Every other scroll region in the app (the shell's main content area, the
+ * full-screen product/customer pickers, etc.) keeps a visible scrollbar,
+ * just a slim one instead of the browser default — more specific than this
+ * so `.no-scrollbar` above still wins for the horizontal chip strips.
+ */
+*::-webkit-scrollbar {
+  width: 1px;
+  height: 1px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 9999px;
+}
+* {
+  scrollbar-width: thin; /* Firefox has no arbitrary-width control, "thin" is the closest fit */
+}

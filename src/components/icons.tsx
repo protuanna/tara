@@ -114,6 +114,16 @@ export function PencilIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function WalletIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon strokeWidth={1.8} {...props}>
+      <path d="M3.5 7.5a2 2 0 0 1 2-2h11.5a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2z" />
+      <path d="M3.5 9.5h14.5" />
+      <path d="M15 13.2h2.6" />
+    </Icon>
+  );
+}
+
 export function ShareIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon strokeWidth={1.8} {...props}>

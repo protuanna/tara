@@ -1,20 +1,24 @@
 "use client";
 
-import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
+import { vnDateKey, formatDateRangeShort } from "@/lib/date";
+import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import type { ReportDTO, ReportPeriod } from "@/lib/services/reportService";
 
-const PERIOD_TABS: { value: ReportPeriod; label: string }[] = [
+const PERIOD_CHIPS: { value: ReportPeriod; label: string }[] = [
   { value: "today", label: "Hôm nay" },
   { value: "7d", label: "7 ngày" },
   { value: "30d", label: "30 ngày" },
+  { value: "all", label: "Tất cả thời gian" },
 ];
 
-function periodUrl(p: ReportPeriod): string {
+function periodUrl(p: ReportPeriod, range?: { from: string; to: string }): string {
+  if (p === "custom" && range) return `/report?period=custom&from=${range.from}&to=${range.to}`;
   return p === "7d" ? "/report" : `/report?period=${p}`;
 }
 
@@ -30,42 +34,68 @@ export default function ReportPage() {
 }
 
 function ReportContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const period = (searchParams.get("period") as ReportPeriod) || "7d";
+  const activeFrom = searchParams.get("from") ?? "";
+  const activeTo = searchParams.get("to") ?? "";
 
-  const { data, loading } = useApiGet<ReportDTO>(`/api/report?period=${period}`);
+  const apiParams = new URLSearchParams({ period });
+  if (period === "custom") {
+    if (activeFrom) apiParams.set("from", activeFrom);
+    if (activeTo) apiParams.set("to", activeTo);
+  }
+  const { data, loading } = useApiGet<ReportDTO>(`/api/report?${apiParams.toString()}`);
+
+  const today = vnDateKey(new Date());
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [fromInput, setFromInput] = useState(activeFrom || today);
+  const [toInput, setToInput] = useState(activeTo || today);
 
   if (loading || !data) return <ReportSkeleton />;
 
   const maxQty = data.topProducts[0]?.qty ?? 1;
   const maxBar = Math.max(...data.bars.map((b) => b.value), 1);
-  const CIRC = 2 * Math.PI * 36;
-  let acc = 0;
-  const donutSegments = data.donut.map((d) => {
-    const frac = d.pct / 100;
-    const seg = {
-      ...d,
-      dash: `${(frac * CIRC).toFixed(1)} ${CIRC.toFixed(1)}`,
-      offset: (-acc * CIRC).toFixed(1),
-    };
-    acc += frac;
-    return seg;
-  });
+
+  function openRangePicker() {
+    setFromInput(activeFrom || today);
+    setToInput(activeTo || today);
+    setRangeOpen(true);
+  }
+
+  function handleApplyRange() {
+    setRangeOpen(false);
+    router.push(periodUrl("custom", { from: fromInput, to: toInput }));
+  }
 
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-6 pt-3">
-      <div className="flex gap-1 rounded-[22px] bg-page p-1">
-        {PERIOD_TABS.map((tab) => (
+      <div className="no-scrollbar flex gap-2 overflow-x-auto">
+        {PERIOD_CHIPS.map((chip) => (
           <Link
-            key={tab.value}
-            href={periodUrl(tab.value)}
-            className={`flex-1 rounded-[18px] py-2 text-center text-[12.5px] font-semibold ${
-              tab.value === period ? "bg-white text-primary-dark shadow" : "text-muted"
+            key={chip.value}
+            href={periodUrl(chip.value)}
+            className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+              chip.value === period
+                ? "bg-primary text-white shadow-md"
+                : "bg-primary-tint text-primary-dark"
             }`}
           >
-            {tab.label}
+            {chip.label}
           </Link>
         ))}
+        <button
+          onClick={openRangePicker}
+          className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+            period === "custom"
+              ? "bg-primary text-white shadow-md"
+              : "bg-primary-tint text-primary-dark"
+          }`}
+        >
+          {period === "custom" && activeFrom && activeTo
+            ? formatDateRangeShort(activeFrom, activeTo)
+            : "Tùy chọn"}
+        </button>
       </div>
 
       <div className="flex flex-col gap-4 rounded-[20px] bg-gradient-to-br from-primary to-primary-dark p-4 text-white">
@@ -91,7 +121,7 @@ function ReportContent() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
           <div className="text-[11px] text-muted">Số đơn</div>
           <div className="text-base font-extrabold">{data.orderCount}</div>
@@ -103,6 +133,10 @@ function ReportContent() {
         <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
           <div className="text-[11px] text-muted">Món đã bán</div>
           <div className="text-base font-extrabold">{data.itemsSold}</div>
+        </div>
+        <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
+          <div className="text-[11px] text-muted">Tổng chi</div>
+          <div className="text-sm font-extrabold text-[#3B5BDB]">{formatVnd(data.totalExpenses)}</div>
         </div>
       </div>
 
@@ -132,40 +166,36 @@ function ReportContent() {
         ))}
       </div>
 
-      <div className="flex flex-col gap-3.5 rounded-[18px] border border-line bg-white p-4">
-        <div className="text-sm font-bold">Cơ cấu thanh toán</div>
-        {donutSegments.length === 0 ? (
-          <p className="text-xs text-muted">Chưa có dữ liệu thanh toán trong kỳ này.</p>
-        ) : (
-          <div className="flex items-center gap-4">
-            <svg width={96} height={96} viewBox="0 0 96 96" className="flex-none -rotate-90">
-              <circle cx="48" cy="48" r="36" fill="none" stroke="#EDEDF2" strokeWidth="14" />
-              {donutSegments.map((d) => (
-                <circle
-                  key={d.method}
-                  cx="48"
-                  cy="48"
-                  r="36"
-                  fill="none"
-                  stroke={d.color}
-                  strokeWidth="14"
-                  strokeDasharray={d.dash}
-                  strokeDashoffset={d.offset}
-                />
-              ))}
-            </svg>
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              {donutSegments.map((d) => (
-                <div key={d.method} className="flex items-center gap-2">
-                  <div className="size-2.5 flex-none rounded-sm" style={{ background: d.color }} />
-                  <div className="flex-1 text-[12.5px] font-semibold">{d.label}</div>
-                  <div className="flex-none text-xs text-muted">{d.pct}%</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <Sheet open={rangeOpen} onClose={() => setRangeOpen(false)}>
+        <div className="text-[15px] font-bold">Chọn khoảng thời gian</div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-muted">Từ ngày</label>
+          <input
+            type="date"
+            value={fromInput}
+            max={toInput}
+            onChange={(e) => setFromInput(e.target.value)}
+            className="rounded-[10px] border border-line px-3 py-3 text-base"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-muted">Đến ngày</label>
+          <input
+            type="date"
+            value={toInput}
+            min={fromInput}
+            onChange={(e) => setToInput(e.target.value)}
+            className="rounded-[10px] border border-line px-3 py-3 text-base"
+          />
+        </div>
+        <button
+          onClick={handleApplyRange}
+          disabled={!fromInput || !toInput}
+          className="rounded-xl bg-primary py-3.5 text-sm font-bold text-white disabled:opacity-60"
+        >
+          Áp dụng
+        </button>
+      </Sheet>
     </div>
   );
 }
@@ -173,15 +203,18 @@ function ReportContent() {
 function ReportSkeleton() {
   return (
     <div className="flex flex-col gap-3.5 px-4 pb-6 pt-3">
-      <Skeleton className="h-11 rounded-[22px]" />
+      <div className="flex gap-2">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-8 w-20 flex-none rounded-full" />
+        ))}
+      </div>
       <Skeleton className="h-[220px] rounded-[20px]" />
-      <div className="grid grid-cols-3 gap-2">
-        {Array.from({ length: 3 }, (_, i) => (
+      <div className="grid grid-cols-2 gap-2">
+        {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-[60px] rounded-2xl" />
         ))}
       </div>
       <Skeleton className="h-[180px] rounded-[18px]" />
-      <Skeleton className="h-[160px] rounded-[18px]" />
     </div>
   );
 }
