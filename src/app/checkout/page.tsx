@@ -18,7 +18,7 @@ import type { CustomerDTO } from "@/lib/services/customersService";
 import type { CategoryDTO } from "@/lib/services/categoriesService";
 import type { ProductDTO } from "@/lib/services/productsService";
 
-type Customer = { id: string; name: string; phone: string | null };
+type Customer = { id: string; name: string; phone: string | null; avatarUrl?: string | null };
 
 export default function CheckoutPage() {
   const { data: customers, loading: loadingCustomers } = useApiGet<CustomerDTO[]>("/api/customers");

@@ -6,6 +6,9 @@ export type CustomerDTO = {
   id: string;
   name: string;
   phone: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  address: string | null;
   orderCount: number;
   totalSpent: number;
   debt: number;
@@ -15,6 +18,9 @@ type CustomerRow = {
   id: string;
   name: string;
   phone: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  address: string | null;
   orders: { total: number; fulfillment_status: FulfillmentStatus }[];
 };
 
@@ -26,7 +32,7 @@ export const customersService = {
       await Promise.all([
         supabase
           .from("customers")
-          .select("id, name, phone, orders(total, fulfillment_status)")
+          .select("id, name, phone, email, avatar_url, address, orders(total, fulfillment_status)")
           .neq("id", WALKIN_CUSTOMER_ID)
           .order("created_at")
           .returns<CustomerRow[]>(),
@@ -46,6 +52,9 @@ export const customersService = {
         id: c.id,
         name: c.name,
         phone: c.phone,
+        email: c.email,
+        avatarUrl: c.avatar_url,
+        address: c.address,
         orderCount: activeOrders.length,
         totalSpent: activeOrders.reduce((sum, o) => sum + o.total, 0),
         debt: debtByCustomer.get(c.id) ?? 0,

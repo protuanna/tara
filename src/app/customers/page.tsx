@@ -6,6 +6,7 @@ import { formatVnd } from "@/lib/format";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { useHeaderSearch } from "@/lib/header-search-context";
+import { normalizeSearchText } from "@/lib/search";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
 export default function CustomersPage() {
@@ -37,10 +38,10 @@ function CustomersScreen({
 
   const { query } = useHeaderSearch();
   const filteredCustomers = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeSearchText(query.trim());
     if (!q) return customers;
     return customers.filter(
-      (c) => c.name.toLowerCase().includes(q) || (c.phone ?? "").includes(q),
+      (c) => normalizeSearchText(c.name).includes(q) || (c.phone ?? "").includes(q),
     );
   }, [customers, query]);
 
@@ -100,9 +101,18 @@ function CustomersScreen({
             onClick={() => setSelected(c)}
             className="flex items-center gap-3 border-b border-primary-tint p-3.5 text-left last:border-b-0"
           >
-            <span className="flex size-10 flex-none items-center justify-center rounded-full bg-primary-tint text-[15px] font-extrabold text-primary-dark">
-              {c.name.trim()[0]}
-            </span>
+            {c.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={c.avatarUrl}
+                alt={c.name}
+                className="size-10 flex-none rounded-full object-cover"
+              />
+            ) : (
+              <span className="flex size-10 flex-none items-center justify-center rounded-full bg-primary-tint text-[15px] font-extrabold text-primary-dark">
+                {c.name.trim()[0]}
+              </span>
+            )}
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-[13.5px] font-bold">{c.name}</span>
               <span className="text-[11.5px] text-muted">
@@ -153,14 +163,40 @@ function CustomersScreen({
         {selected && (
           <>
             <div className="flex items-center gap-3">
-              <span className="flex size-11 flex-none items-center justify-center rounded-full bg-primary-tint text-base font-extrabold text-primary-dark">
-                {selected.name.trim()[0]}
-              </span>
+              {selected.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={selected.avatarUrl}
+                  alt={selected.name}
+                  className="size-11 flex-none rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex size-11 flex-none items-center justify-center rounded-full bg-primary-tint text-base font-extrabold text-primary-dark">
+                  {selected.name.trim()[0]}
+                </span>
+              )}
               <div className="flex flex-col gap-0.5">
                 <div className="text-[15px] font-bold">{selected.name}</div>
                 <div className="text-xs text-muted">{selected.phone || "Chưa có SĐT"}</div>
               </div>
             </div>
+
+            {(selected.email || selected.address) && (
+              <div className="flex flex-col gap-1.5 rounded-2xl border border-line p-3.5 text-[13px]">
+                {selected.email && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted">Email</span>
+                    <span className="font-semibold">{selected.email}</span>
+                  </div>
+                )}
+                {selected.address && (
+                  <div className="flex justify-between gap-2">
+                    <span className="flex-none text-muted">Địa chỉ</span>
+                    <span className="text-right font-semibold">{selected.address}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-between rounded-2xl border border-line p-3.5 text-[13px]">
               <span className="text-muted">Đã mua</span>

@@ -18,7 +18,7 @@ import type { CustomerDTO } from "@/lib/services/customersService";
 import type { CategoryDTO } from "@/lib/services/categoriesService";
 import type { ProductDTO } from "@/lib/services/productsService";
 
-type Customer = { id: string; name: string; phone: string | null };
+type Customer = { id: string; name: string; phone: string | null; avatarUrl?: string | null };
 // `key` is stable per line (the order_item's own id for pre-existing lines,
 // or the product's id for a freshly-added one) — `productId` can be null
 // for a pre-existing line whose product was since deleted

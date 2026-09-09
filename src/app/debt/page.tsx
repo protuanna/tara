@@ -6,6 +6,7 @@ import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
 import { Skeleton } from "@/components/skeleton";
 import { useHeaderSearch } from "@/lib/header-search-context";
+import { normalizeSearchText } from "@/lib/search";
 import type { DebtorDTO } from "@/lib/services/debtService";
 
 export default function DebtPage() {
@@ -13,11 +14,11 @@ export default function DebtPage() {
 
   const { query } = useHeaderSearch();
   const filteredDebtors = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeSearchText(query.trim());
     if (!data) return [];
     if (!q) return data.debtors;
     return data.debtors.filter(
-      (d) => (d.name ?? "").toLowerCase().includes(q) || (d.phone ?? "").includes(q),
+      (d) => normalizeSearchText(d.name ?? "").includes(q) || (d.phone ?? "").includes(q),
     );
   }, [data, query]);
 

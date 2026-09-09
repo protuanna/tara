@@ -225,7 +225,7 @@ function ProductsScreen({
                     <img
                       src={product.image_url}
                       alt={product.name}
-                      className="absolute inset-0 size-full object-cover"
+                      className="absolute inset-0 size-full object-contain"
                     />
                   ) : (
                     product.name.trim()[0]

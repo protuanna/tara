@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatVnd } from "@/lib/format";
+import { normalizeSearchText } from "@/lib/search";
 import type { CategoryDTO } from "@/lib/services/categoriesService";
 import type { ProductDTO } from "@/lib/services/productsService";
 
@@ -18,7 +19,10 @@ import type { ProductDTO } from "@/lib/services/productsService";
  * scroll area, which turned out unreliable nested inside this component's
  * own `fixed` full-screen overlay: the tabs would still scroll out of view
  * once "Tất cả" pushed the grid past one screen. Structural flex layout
- * guarantees the tabs and the continue button stay put regardless. Renders
+ * guarantees the tabs and the continue button stay put regardless. The
+ * search box (added later) follows the same rule as `<CustomerPicker>`'s:
+ * category tabs hide while there's search text, since they're two ways to
+ * filter the same list and showing both at once is redundant. Renders
  * as a `position: fixed` full-viewport overlay (same page, no route
  * change) capped to the app's own `max-w-[480px]` mobile-width column
  * (like the root shell in layout.tsx), not a bare `inset-0` box, so it
@@ -46,6 +50,7 @@ export function ProductPicker({
   onDec: (productId: string) => void;
 }) {
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const totalQty = useMemo(
     () => Array.from(quantities.values()).reduce((sum, qty) => sum + qty, 0),
@@ -54,11 +59,15 @@ export function ProductPicker({
 
   if (!open) return null;
 
-  const filtered = products.filter((p) => categoryId === null || p.category_id === categoryId);
+  const query = normalizeSearchText(search.trim());
+  const filtered = query
+    ? products.filter((p) => normalizeSearchText(p.name).includes(query))
+    : products.filter((p) => categoryId === null || p.category_id === categoryId);
 
   function handleClose() {
     onClose();
     setCategoryId(null);
+    setSearch("");
   }
 
   return (
@@ -75,31 +84,42 @@ export function ProductPicker({
           <div className="text-base font-extrabold">Thêm sản phẩm</div>
         </div>
 
-        <div className="no-scrollbar flex flex-none gap-2 overflow-x-auto border-b border-line bg-surface px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setCategoryId(null)}
-            className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
-              categoryId === null ? "bg-primary text-white" : "border border-line bg-white text-ink"
-            }`}
-          >
-            Tất cả
-          </button>
-          {categories.map((cat) => (
+        <div className="flex-none border-b border-line bg-surface px-4 py-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm sản phẩm..."
+            className="w-full rounded-[10px] border border-line bg-white px-3 py-3 text-base"
+          />
+        </div>
+
+        {!query && (
+          <div className="no-scrollbar flex flex-none gap-2 overflow-x-auto border-b border-line bg-surface px-4 py-3">
             <button
-              key={cat.id}
               type="button"
-              onClick={() => setCategoryId(cat.id)}
+              onClick={() => setCategoryId(null)}
               className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
-                categoryId === cat.id
-                  ? "bg-primary text-white"
-                  : "border border-line bg-white text-ink"
+                categoryId === null ? "bg-primary text-white" : "border border-line bg-white text-ink"
               }`}
             >
-              {cat.name}
+              Tất cả
             </button>
-          ))}
-        </div>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setCategoryId(cat.id)}
+                className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+                  categoryId === cat.id
+                    ? "bg-primary text-white"
+                    : "border border-line bg-white text-ink"
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-4 py-3.5">
           <div className="grid grid-cols-2 gap-2.5">
@@ -117,7 +137,7 @@ export function ProductPicker({
                       <img
                         src={product.image_url}
                         alt={product.name}
-                        className="absolute inset-0 size-full object-cover"
+                        className="absolute inset-0 size-full object-contain"
                       />
                     ) : (
                       product.name.trim()[0]

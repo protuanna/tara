@@ -64,12 +64,18 @@ export interface Database {
           id: string;
           name: string;
           phone: string | null;
+          email: string | null;
+          avatar_url: string | null;
+          address: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           name: string;
           phone?: string | null;
+          email?: string | null;
+          avatar_url?: string | null;
+          address?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["customers"]["Insert"]>;

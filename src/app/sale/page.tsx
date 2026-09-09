@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { useApiGet } from "@/lib/use-api";
 import { formatVnd } from "@/lib/format";
+import { useHeaderSearch } from "@/lib/header-search-context";
+import { normalizeSearchText } from "@/lib/search";
 import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import type { CategoryDTO } from "@/lib/services/categoriesService";
@@ -28,13 +30,20 @@ function SaleScreen({ categories, products }: { categories: CategoryDTO[]; produ
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
 
-  const filteredProducts = useMemo(
-    () =>
-      selectedCategoryId === undefined
-        ? products
-        : products.filter((p) => p.category_id === selectedCategoryId),
-    [products, selectedCategoryId],
-  );
+  // Header search (see <SiteHeader>/useHeaderSearch) wins over the category
+  // tabs while there's text in it — same "search replaces, not combines
+  // with, other filters" rule as <CustomerPicker>/<ProductPicker>.
+  const { query } = useHeaderSearch();
+  const searchQuery = normalizeSearchText(query.trim());
+
+  const filteredProducts = useMemo(() => {
+    if (searchQuery) {
+      return products.filter((p) => normalizeSearchText(p.name).includes(searchQuery));
+    }
+    return selectedCategoryId === undefined
+      ? products
+      : products.filter((p) => p.category_id === selectedCategoryId);
+  }, [products, selectedCategoryId, searchQuery]);
 
   const cartQtyByProduct = useMemo(() => {
     const map = new Map<string, number>();
@@ -65,37 +74,39 @@ function SaleScreen({ categories, products }: { categories: CategoryDTO[]; produ
 
   return (
     <div className="flex flex-col">
-      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
-        <button
-          onClick={() => setSelectedCategoryId(undefined)}
-          className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
-            selectedCategoryId === undefined
-              ? "bg-primary text-white"
-              : "border border-line bg-white text-ink"
-          }`}
-        >
-          Tất cả
-        </button>
-        {categories.map((cat) => (
+      {!searchQuery && (
+        <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pb-2 pt-3.5">
           <button
-            key={cat.id}
-            onClick={() => setSelectedCategoryId(cat.id)}
+            onClick={() => setSelectedCategoryId(undefined)}
             className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
-              cat.id === selectedCategoryId
+              selectedCategoryId === undefined
                 ? "bg-primary text-white"
                 : "border border-line bg-white text-ink"
             }`}
           >
-            {cat.name}
+            Tất cả
           </button>
-        ))}
-        <Link
-          href="/products"
-          className="flex-none whitespace-nowrap rounded-full border border-dashed border-primary-light bg-white px-3.5 py-2 text-xs font-semibold text-primary-dark"
-        >
-          + Sản phẩm
-        </Link>
-      </div>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategoryId(cat.id)}
+              className={`flex-none whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold ${
+                cat.id === selectedCategoryId
+                  ? "bg-primary text-white"
+                  : "border border-line bg-white text-ink"
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+          <Link
+            href="/products"
+            className="flex-none whitespace-nowrap rounded-full border border-dashed border-primary-light bg-white px-3.5 py-2 text-xs font-semibold text-primary-dark"
+          >
+            + Sản phẩm
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2.5 px-4 pb-4">
         {filteredProducts.map((product) => {
@@ -112,7 +123,7 @@ function SaleScreen({ categories, products }: { categories: CategoryDTO[]; produ
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="absolute inset-0 size-full object-cover"
+                    className="absolute inset-0 size-full object-contain"
                   />
                 ) : (
                   product.name.trim()[0]

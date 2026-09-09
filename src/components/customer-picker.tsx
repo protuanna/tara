@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import { apiMutate } from "@/lib/use-api";
+import { normalizeSearchText } from "@/lib/search";
 import { WALKIN_CUSTOMER_ID } from "@/lib/supabase/types";
 
-export type PickerCustomer = { id: string; name: string; phone: string | null };
+export type PickerCustomer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  avatarUrl?: string | null;
+};
 
 const WALKIN_CUSTOMER: PickerCustomer = { id: WALKIN_CUSTOMER_ID, name: "Khách lẻ", phone: null };
 
@@ -57,10 +63,10 @@ export function CustomerPicker({
     ? customers
     : [WALKIN_CUSTOMER, ...customers];
 
-  const query = search.trim().toLowerCase();
+  const query = normalizeSearchText(search.trim());
   const filtered = query
     ? allCustomers.filter(
-        (c) => c.name.toLowerCase().includes(query) || (c.phone ?? "").includes(query),
+        (c) => normalizeSearchText(c.name).includes(query) || (c.phone ?? "").includes(query),
       )
     : allCustomers;
 
@@ -166,9 +172,18 @@ export function CustomerPicker({
                   c.id === selectedId ? "border-primary bg-primary-tint" : "border-line bg-white"
                 }`}
               >
-                <span className="flex size-[38px] flex-none items-center justify-center rounded-full bg-primary-tint text-[15px] font-extrabold text-primary-dark">
-                  {c.name.trim()[0]}
-                </span>
+                {c.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.avatarUrl}
+                    alt={c.name}
+                    className="size-[38px] flex-none rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="flex size-[38px] flex-none items-center justify-center rounded-full bg-primary-tint text-[15px] font-extrabold text-primary-dark">
+                    {c.name.trim()[0]}
+                  </span>
+                )}
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-[13.5px] font-bold">{c.name}</span>
                   <span className="text-[11.5px] text-muted">

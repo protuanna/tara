@@ -218,6 +218,18 @@ image tooling is installed) if the source logo changes:
   "Tổng phải thu"/Sổ nợ, even though it can't be attributed to a named
   person; it all lands on the "Khách lẻ" row as one lump sum, collectible
   the same way as any other customer's debt.
+- `customers` also has `email`/`avatar_url`/`address` (migration `0012`),
+  added specifically to receive data migrated from the shop's old POS
+  (sobanhang.com) — none of the app's own flows write them yet, the "+ Thêm
+  khách hàng" quick-add sheet still only collects name/phone by design (see
+  `<CustomerPicker>`'s own note on why it stays minimal). They're read-only
+  display fields for now: `/customers`' list rows and detail sheet, and
+  `<CustomerPicker>`, render `avatar_url` as a real photo in place of the
+  letter-circle when present (same "just store/render the URL, no upload
+  flow" shape as `products.image_url`); the detail sheet also shows
+  email/address when non-empty. If a future screen ever lets someone *edit*
+  these, go through `customersService` rather than writing `customers`
+  directly.
 - A newly-saved order gets `fulfillment_status: "processing"` directly, not
   the `"pending"` column default — that's what the design prototype's
   `saveOrder()` does, so `ordersService.create()` sets it explicitly. Don't
@@ -240,15 +252,22 @@ image tooling is installed) if the source logo changes:
   search box over the already-loaded customer list (no extra API call) plus
   an "+ Thêm khách mới" toggle that only reveals the add-customer mini-form
   when tapped, rather than always showing it above the list.
-- `<ProductPicker>` (`src/components/product-picker.tsx`) is
-  `/orders/[id]/edit`'s "Thêm sản phẩm" sheet — same shape as
-  `<CustomerPicker>`: a search box over the already-loaded product list,
-  with the category chips (a quick filter, same tabs as `/products`) only
-  shown while the search box is empty. Only used by order-edit — `/sale`'s
-  own product browsing is a full-page category grid, a different enough UX
-  (visual tiles vs. a searchable list) that it wasn't worth forcing onto
-  this component too. Selecting a product doesn't close the sheet, so the
-  cashier can add several in a row.
+- `<ProductPicker>` (`src/components/product-picker.tsx`) is the shared
+  "Thêm sản phẩm" full-screen view for **both** checkout and order-edit —
+  `/sale`'s own product browsing (the sale-flow's own grid) is the only
+  screen with a separate implementation of this same tile UI, kept apart
+  because it also owns the persistent-cart plumbing `<ProductPicker>`
+  doesn't need. Grid-of-tiles layout (image/initial box, name, price, a qty
+  stepper that replaces the "+" once a product's in the order), category
+  tabs as a quick filter, plus a search box over the already-loaded product
+  list (no extra API call) — same "hide the category tabs while there's
+  search text" rule as `<CustomerPicker>`, since they're two ways to filter
+  the same list. Selecting a product doesn't close the view, so the cashier
+  can add several in a row; the header/tabs/search row and the bottom
+  "Tiếp tục" button are separate `flex-none` rows around the scrollable
+  grid (not `position: sticky` inside it — that turned out unreliable
+  nested inside this component's own `fixed` full-screen overlay once the
+  grid grew past one screen).
 - `ordersService.create()` recomputes totals server-side via `calcTotals()`
   from the raw cart/fee/discount — never trust a client-submitted total.
   It's also **not transactional**: it inserts the order then its
@@ -420,6 +439,15 @@ image tooling is installed) if the source logo changes:
   that in mind for any future view.
 - Currency is always formatted via `formatVnd()` in `src/lib/format.ts`
   (`n.toLocaleString('vi-VN') + 'Đ'`) — use it everywhere money is displayed.
+- Every client-side name/phone search filter runs both the query and the
+  candidate field through `normalizeSearchText()` (`src/lib/search.ts`) so
+  matching is case- and Vietnamese-diacritic-insensitive (`"tra dao"` matches
+  `"Trà Đào Vàng"`). `đ`/`Đ` don't decompose via Unicode NFD like the rest of
+  the Vietnamese alphabet, so the helper strips them with an explicit
+  replace after the NFD combining-mark strip. Used by `/sale`'s header
+  search, `/customers` and `/debt`'s header search, and the local search
+  boxes in `<ProductPicker>`/`<CustomerPicker>` — apply it to any new
+  name-filtering search box rather than a bare `.toLowerCase().includes()`.
 - "Today" for the revenue card / any future date-scoped report must be
   computed in shop-local time (`Asia/Ho_Chi_Minh`, fixed UTC+7), not UTC or
   server time — use `vnTodayStartIso()` / `formatOrderTime()` in
