@@ -50,7 +50,7 @@ export default function HomePage() {
         <QuickAction href="/customers" label="Khách hàng" bg="bg-[#FDECF3]" fg="text-[#B03A70]">
           <PeopleIcon width={23} height={23} />
         </QuickAction>
-        <QuickAction href="/expenses" label="Chi" bg="bg-[#E9EEFF]" fg="text-[#3B5BDB]">
+        <QuickAction href="/expenses" label="Thu Chi" bg="bg-[#E9EEFF]" fg="text-[#3B5BDB]">
           <WalletIcon width={23} height={23} />
         </QuickAction>
       </div>

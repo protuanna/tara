@@ -21,8 +21,10 @@ an "Tất cả" one, add category, add/delete product — no image upload yet, s
 below), **Debt** (`/debt`, "Sổ nợ" —
 total receivable + per-customer collect action), **Customers**
 (`/customers`, list + add + per-customer detail with order stats and
-collect-debt), and **Report** (`/report`, period tabs, revenue bar chart,
-stat tiles, top products, payment-method donut). There's no test suite —
+collect-debt), and **Report** (`/report`, period tabs + four stats: doanh
+thu kỳ này, tổng tiền hàng, tổng thu, tổng chi — see "Thu Chi" below for
+the ninth screen, `/expenses`, added after the original 8). There's no
+test suite —
 every screen above was verified by hand against a live Supabase project
 (seed data in, hit the route, check the rendered numbers, clean up), not
 just "it builds." Do the same when changing business logic: a type-check
@@ -377,20 +379,11 @@ image tooling is installed) if the source logo changes:
   unpaid ones — it's "how much business this customer represents," not
   revenue. Don't reuse the Home revenue filter (`payment_status !==
   "unpaid"`) here; they're different metrics on purpose.
-- `/report`'s daily bar chart and its period-scoped numbers (revenue, order
-  count, top products, payment donut) are **two independent windows**, both
-  computed in `reportService.getReport()`: the bars always cover the last 7
-  VN-calendar-days (10 for the `30d` period), regardless of which period tab
-  is active, while everything else uses the selected period's cutoff
-  (`today`/`7d`/`30d`). This matches the design, not a bug — don't try to
-  make the bars "agree" with the period tab. Both windows apply the same
-  revenue-counting rule as Home (`fulfillment_status != "cancel" &&
-  payment_status != "unpaid"`), filtered at the query level. `vnDateKey()`
-  (`src/lib/date.ts`) is what buckets rows into VN calendar days for the
-  bars — reuse it for any other daily-grouping report. The donut's
-  SVG stroke-dasharray/offset math is recomputed client-side in
-  `report/page.tsx` from the plain `{ method, pct }` data the API returns —
-  the API itself doesn't know about SVG geometry.
+- `/report` applies the same revenue-counting rule as Home
+  (`fulfillment_status != "cancel" && payment_status != "unpaid"`),
+  filtered at the query level in `reportService.getReport()` — see the
+  "Thu Chi" section above for what `/report` actually shows now (four
+  numbers, no chart/top-products/donut — those were removed).
 - Bottom-sheet overlays (`src/components/sheet.tsx`, `<Sheet>`) use
   `position: fixed` + a `max-w-[480px]` inner panel, not `absolute` inside
   the shell — the shell's content area is `overflow-y-auto`, which clips
@@ -550,3 +543,50 @@ implementation here is a payment-integrity bug, not a cosmetic one.
   address to print in the header (unlike the reference receipt image this
   was modeled on), so it only prints "Tara Shop" — revisit if a
   configurable shop address/name ever gets added.
+
+## Thu Chi (income/expense ledger)
+
+`/expenses` — reachable from Home's "Thu Chi" quick action, not in the
+bottom nav — is a flat cash ledger independent of the order/revenue side of
+the schema: freeform entries of money in ("thu") or out ("chi"), each just
+a name + amount + optional note, no category taxonomy. One table
+(`expenses`, migration `0009`, soft-delete via `deleted_at` added in
+`0010`) holds both directions, distinguished by the `type` column
+(`cash_entry_type` enum, migration `0011` — the table started "chi"-only,
+so existing/defaulted rows are `'chi'`). `expensesService.list()` takes an
+optional `type` filter alongside the existing `time` one;
+`expensesService.create()` requires `type`.
+
+- **Home's revenue card stays order-only** — a "thu" entry (manual cash
+  received that didn't come through an order, e.g. subletting counter
+  space, selling scrap) is not folded into it, still derived purely from
+  `orders.total`. **`/report`'s "Doanh thu kỳ này" is the one exception**:
+  `reportService.getReport()` computes `revenue = orderRevenue + totalIncome
+  - totalExpenses` — the only place in the app where Thu Chi entries affect
+  a revenue figure. Don't let that formula leak into Home, and don't
+  assume `/report`'s `revenue` and Home's revenue card agree for the same
+  period — they're deliberately different metrics now.
+- **`/report`'s `totalExpenses`/`totalIncome` stay filtered to `type =
+  "chi"`/`type = "thu"` respectively** (`reportService.getReport()`) — this
+  is the one place outside `/expenses` itself that reads the `expenses`
+  table; check it again if another report/stat ever reads it directly.
+- `/report` was deliberately trimmed to four numbers — "Doanh thu kỳ này"
+  (the hero card), "Tổng tiền hàng" (`orderRevenue`, the pre-Thu-Chi order
+  total), "Tổng thu", "Tổng chi" — dropping the previous avg-order-value,
+  items-sold, top-3-products list, and the 7/10-day daily bar chart
+  entirely, both from the UI and from `reportService.getReport()`'s query
+  (no more `order_items` join or bars/topProducts computation). Don't
+  re-add those without being asked; the simplification was deliberate, not
+  a placeholder state.
+- The add-entry sheet's Thu/Chi toggle and the list/summary cards
+  (`Tổng thu` in `text-paid` green, `Tổng chi` in the existing `#3B5BDB`
+  blue) are the only UI surface for `type` — filtering the list by
+  Tất cả/Thu/Chi reuses the same URL-search-param pattern as `/orders`
+  (`useSearchParams()` wrapped in `<Suspense>`, filter chips as plain
+  `<Link>`s), not client state.
+- `/expenses`' header mirrors `/orders` exactly, not the rest of the app's
+  "‹ page title" convention: a sticky bar holding the Tất cả/Thu/Chi tabs
+  plus a "Bộ lọc" button (badged with a count when the time filter is
+  active) that opens a sheet containing just the time chips + custom-range
+  picker — there's no separate back-button/title row above it, same as
+  `/orders`. Don't add one back by copying another screen's header pattern.

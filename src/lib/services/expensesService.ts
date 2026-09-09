@@ -1,34 +1,47 @@
 import { createClient } from "@/lib/supabase/server";
 import { vnTodayStartIso, daysAgoIso, vnDateStartIso, vnDateEndExclusiveIso } from "@/lib/date";
+import type { CashEntryType } from "@/lib/supabase/types";
+
+export type { CashEntryType };
 
 export type ExpenseDTO = {
   id: string;
   name: string;
   amount: number;
   note: string | null;
+  type: CashEntryType;
   created_at: string;
 };
 
 export type ExpenseTimeFilter = "all" | "today" | "7d" | "30d" | "custom";
+export type ExpenseTypeFilter = "all" | CashEntryType;
 
 const TIME_VALUES: ExpenseTimeFilter[] = ["today", "7d", "30d", "custom"];
+const TYPE_VALUES: CashEntryType[] = ["thu", "chi"];
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function parseExpenseTimeFilter(v: string | null): ExpenseTimeFilter {
   return v && TIME_VALUES.includes(v as ExpenseTimeFilter) ? (v as ExpenseTimeFilter) : "all";
 }
+export function parseExpenseTypeFilter(v: string | null): ExpenseTypeFilter {
+  return v && TYPE_VALUES.includes(v as CashEntryType) ? (v as CashEntryType) : "all";
+}
 
 export const expensesService = {
   async list(
-    filters: { time: ExpenseTimeFilter; from?: string; to?: string } = { time: "all" },
+    filters: { time: ExpenseTimeFilter; type: ExpenseTypeFilter; from?: string; to?: string } = {
+      time: "all",
+      type: "all",
+    },
   ): Promise<ExpenseDTO[]> {
     const supabase = await createClient();
     let query = supabase
       .from("expenses")
-      .select("id, name, amount, note, created_at")
+      .select("id, name, amount, note, type, created_at")
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
+    if (filters.type !== "all") query = query.eq("type", filters.type);
     if (filters.time === "today") query = query.gte("created_at", vnTodayStartIso());
     else if (filters.time === "7d") query = query.gte("created_at", daysAgoIso(7));
     else if (filters.time === "30d") query = query.gte("created_at", daysAgoIso(30));
@@ -49,19 +62,28 @@ export const expensesService = {
   async create(input: {
     name: string;
     amount: number;
+    type: CashEntryType;
     note?: string;
   }): Promise<{ data: ExpenseDTO } | { error: string }> {
     const name = input.name.trim();
-    if (!name) return { error: "Vui lòng nhập nội dung chi" };
+    if (!name) return { error: input.type === "thu" ? "Vui lòng nhập nội dung thu" : "Vui lòng nhập nội dung chi" };
     if (!Number.isFinite(input.amount) || input.amount <= 0) {
       return { error: "Vui lòng nhập số tiền hợp lệ" };
+    }
+    if (input.type !== "thu" && input.type !== "chi") {
+      return { error: "Loại khoản thu chi không hợp lệ" };
     }
 
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("expenses")
-      .insert({ name, amount: Math.round(input.amount), note: input.note?.trim() || null })
-      .select("id, name, amount, note, created_at")
+      .insert({
+        name,
+        amount: Math.round(input.amount),
+        note: input.note?.trim() || null,
+        type: input.type,
+      })
+      .select("id, name, amount, note, type, created_at")
       .single();
 
     if (error) throw error;

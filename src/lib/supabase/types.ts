@@ -13,6 +13,7 @@ export type FulfillmentStatus = "pending" | "processing" | "done" | "cancel";
 export type PaymentStatus = "paid" | "debt" | "unpaid";
 export type PaymentMethod = "cash" | "qr" | "debt" | "unpaid";
 export type DiscountType = "vnd" | "pct";
+export type CashEntryType = "thu" | "chi";
 
 export interface Database {
   public: {
@@ -200,6 +201,7 @@ export interface Database {
           name: string;
           amount: number;
           note: string | null;
+          type: CashEntryType;
           created_at: string;
           deleted_at: string | null;
         };
@@ -208,6 +210,7 @@ export interface Database {
           name: string;
           amount: number;
           note?: string | null;
+          type?: CashEntryType;
           created_at?: string;
           deleted_at?: string | null;
         };
@@ -237,6 +240,7 @@ export interface Database {
       payment_status: PaymentStatus;
       payment_method: PaymentMethod;
       discount_type: DiscountType;
+      cash_entry_type: CashEntryType;
     };
     CompositeTypes: Record<string, never>;
   };

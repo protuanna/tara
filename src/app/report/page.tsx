@@ -54,9 +54,6 @@ function ReportContent() {
 
   if (loading || !data) return <ReportSkeleton />;
 
-  const maxQty = data.topProducts[0]?.qty ?? 1;
-  const maxBar = Math.max(...data.bars.map((b) => b.value), 1);
-
   function openRangePicker() {
     setFromInput(activeFrom || today);
     setToInput(activeTo || today);
@@ -98,72 +95,24 @@ function ReportContent() {
         </button>
       </div>
 
-      <div className="flex flex-col gap-4 rounded-[20px] bg-gradient-to-br from-primary to-primary-dark p-4 text-white">
-        <div className="flex flex-col gap-0.5">
-          <div className="text-[12.5px] opacity-85">Doanh thu kỳ này</div>
-          <div className="text-[29px] font-extrabold tracking-tight">{formatVnd(data.revenue)}</div>
-        </div>
-        <div className="flex h-[112px] items-end gap-1.5">
-          {data.bars.map((bar) => (
-            <div key={bar.key} className="flex flex-1 flex-col items-center gap-1.5">
-              <div className="h-[13px] text-[10.5px] font-semibold opacity-95">
-                {bar.value > 0 ? `${Math.round(bar.value / 1000)}k` : ""}
-              </div>
-              <div
-                className={`w-full rounded-t-lg rounded-b-[3px] ${
-                  bar.label === "Nay" ? "bg-white" : "bg-white/55"
-                }`}
-                style={{ height: `${Math.max(6, Math.round((bar.value / maxBar) * 96))}px` }}
-              />
-              <div className="text-[10.5px] opacity-90">{bar.label}</div>
-            </div>
-          ))}
-        </div>
+      <div className="flex flex-col gap-0.5 rounded-[20px] bg-gradient-to-br from-primary to-primary-dark p-4 text-white">
+        <div className="text-[12.5px] opacity-85">Doanh thu kỳ này</div>
+        <div className="text-[29px] font-extrabold tracking-tight">{formatVnd(data.revenue)}</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
-          <div className="text-[11px] text-muted">Số đơn</div>
-          <div className="text-base font-extrabold">{data.orderCount}</div>
+          <div className="text-[11px] text-muted">Tổng tiền hàng</div>
+          <div className="text-sm font-extrabold">{formatVnd(data.orderRevenue)}</div>
         </div>
         <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
-          <div className="text-[11px] text-muted">TB/đơn</div>
-          <div className="text-sm font-extrabold">{formatVnd(data.avgOrder)}</div>
-        </div>
-        <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
-          <div className="text-[11px] text-muted">Món đã bán</div>
-          <div className="text-base font-extrabold">{data.itemsSold}</div>
+          <div className="text-[11px] text-muted">Tổng thu</div>
+          <div className="text-sm font-extrabold text-paid">{formatVnd(data.totalIncome)}</div>
         </div>
         <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
           <div className="text-[11px] text-muted">Tổng chi</div>
           <div className="text-sm font-extrabold text-[#3B5BDB]">{formatVnd(data.totalExpenses)}</div>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-[18px] border border-line bg-white p-4">
-        <div className="text-sm font-bold">Bán chạy nhất</div>
-        {data.topProducts.length === 0 && (
-          <p className="text-xs text-muted">Chưa có dữ liệu bán hàng trong kỳ này.</p>
-        )}
-        {data.topProducts.map((p, i) => (
-          <div key={p.name} className="flex items-center gap-3">
-            <div className="flex size-[34px] flex-none items-center justify-center rounded-xl bg-primary-tint text-[13px] font-extrabold text-primary-dark">
-              {i + 1}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex justify-between gap-2">
-                <span className="truncate text-[13px] font-semibold">{p.name}</span>
-                <span className="flex-none text-xs text-muted">{p.qty} phần</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-page">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${Math.round((p.qty / maxQty) * 100)}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
       </div>
 
       <Sheet open={rangeOpen} onClose={() => setRangeOpen(false)}>
@@ -208,13 +157,12 @@ function ReportSkeleton() {
           <Skeleton key={i} className="h-8 w-20 flex-none rounded-full" />
         ))}
       </div>
-      <Skeleton className="h-[220px] rounded-[20px]" />
-      <div className="grid grid-cols-2 gap-2">
-        {Array.from({ length: 4 }, (_, i) => (
+      <Skeleton className="h-[92px] rounded-[20px]" />
+      <div className="grid grid-cols-3 gap-2">
+        {Array.from({ length: 3 }, (_, i) => (
           <Skeleton key={i} className="h-[60px] rounded-2xl" />
         ))}
       </div>
-      <Skeleton className="h-[180px] rounded-[18px]" />
     </div>
   );
 }
