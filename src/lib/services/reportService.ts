@@ -19,9 +19,9 @@ export type ReportDTO = {
   totalIncome: number;
   totalExpenses: number;
   /**
-   * "Doanh thu đã thu" — subset of orderRevenue actually collected, i.e.
-   * payment_status = "paid" only (excludes "debt" orders, unlike
-   * orderRevenue which counts both paid and debt as revenue).
+   * "Doanh thu đã thu" — same shape as `revenue` (+ thu, − chi) but built
+   * from paid orders only, excluding "debt" orders (unlike `revenue`/
+   * `orderRevenue`, which count both paid and debt as revenue).
    */
   collectedRevenue: number;
   /**
@@ -100,7 +100,7 @@ export const reportService = {
     if (debtPaidErr) throw debtPaidErr;
 
     const orderRevenue = (statsOrders ?? []).reduce((sum, o) => sum + o.total, 0);
-    const collectedRevenue = (statsOrders ?? [])
+    const paidOrderRevenue = (statsOrders ?? [])
       .filter((o) => o.payment_status === "paid")
       .reduce((sum, o) => sum + o.total, 0);
     const totalIncome = (expenseRows ?? [])
@@ -120,6 +120,9 @@ export const reportService = {
     // a deliberate change from the order-only figure Home's revenue card
     // still uses — see CLAUDE.md "Thu Chi" section for why the two diverge.
     const revenue = orderRevenue + totalIncome - totalExpenses;
+    // "Doanh thu đã thu" = same formula, but only counting orders actually
+    // paid (excludes "debt" orders from the order side of the sum).
+    const collectedRevenue = paidOrderRevenue + totalIncome - totalExpenses;
 
     return {
       revenue,

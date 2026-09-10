@@ -95,17 +95,19 @@ function ReportContent() {
         </button>
       </div>
 
-      <div className="flex flex-col gap-0.5 rounded-[20px] bg-gradient-to-br from-primary to-primary-dark p-4 text-white">
-        <div className="text-[12.5px] opacity-85">Doanh thu kỳ này</div>
-        <div className="text-[29px] font-extrabold tracking-tight">{formatVnd(data.revenue)}</div>
-      </div>
-
-      <div className="flex items-center justify-between rounded-2xl border border-line bg-white p-4">
+      <div className="flex flex-col gap-3 rounded-[20px] bg-gradient-to-br from-primary to-primary-dark p-4 text-white">
         <div className="flex flex-col gap-0.5">
-          <div className="text-[13px] text-muted">Doanh thu đã thu</div>
-          <div className="text-[11px] text-muted">Chỉ tính đơn đã thanh toán</div>
+          <div className="text-[12.5px] opacity-85">Tổng doanh thu kỳ này</div>
+          <div className="text-[29px] font-extrabold tracking-tight">{formatVnd(data.revenue)}</div>
         </div>
-        <div className="text-xl font-extrabold text-paid">{formatVnd(data.collectedRevenue)}</div>
+        <div className="h-px bg-white/20" />
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-0.5">
+            <div className="text-[12.5px] opacity-85">Doanh thu đã thu</div>
+            <div className="text-[10.5px] opacity-65">Đơn đã thanh toán + thu − chi</div>
+          </div>
+          <div className="text-lg font-extrabold">{formatVnd(data.collectedRevenue)}</div>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -181,8 +183,7 @@ function ReportSkeleton() {
           <Skeleton key={i} className="h-8 w-20 flex-none rounded-full" />
         ))}
       </div>
-      <Skeleton className="h-[92px] rounded-[20px]" />
-      <Skeleton className="h-[64px] rounded-2xl" />
+      <Skeleton className="h-[170px] rounded-[20px]" />
       <div className="grid grid-cols-3 gap-2">
         {Array.from({ length: 3 }, (_, i) => (
           <Skeleton key={i} className="h-[60px] rounded-2xl" />
