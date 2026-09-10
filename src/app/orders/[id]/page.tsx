@@ -181,7 +181,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      {order.payment_status === "unpaid" && order.payos_qr_code && (
+      {order.payment_status !== "paid" && order.payos_qr_code && (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-white p-4">
           <div className="text-[13px] font-bold">Quét mã để thanh toán</div>
           <QrCode value={order.payos_qr_code} />
