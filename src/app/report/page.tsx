@@ -100,6 +100,14 @@ function ReportContent() {
         <div className="text-[29px] font-extrabold tracking-tight">{formatVnd(data.revenue)}</div>
       </div>
 
+      <div className="flex items-center justify-between rounded-2xl border border-line bg-white p-4">
+        <div className="flex flex-col gap-0.5">
+          <div className="text-[13px] text-muted">Doanh thu đã thu</div>
+          <div className="text-[11px] text-muted">Chỉ tính đơn đã thanh toán</div>
+        </div>
+        <div className="text-xl font-extrabold text-paid">{formatVnd(data.collectedRevenue)}</div>
+      </div>
+
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
           <div className="text-[11px] text-muted">Tổng tiền hàng</div>
@@ -112,6 +120,22 @@ function ReportContent() {
         <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
           <div className="text-[11px] text-muted">Tổng chi</div>
           <div className="text-sm font-extrabold text-[#3B5BDB]">{formatVnd(data.totalExpenses)}</div>
+        </div>
+      </div>
+
+      <div className="mt-1 flex flex-col gap-2">
+        <div className="text-[13px] font-bold">Công nợ</div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
+            <div className="text-[11px] text-muted">Tổng số nợ</div>
+            <div className="text-base font-extrabold text-unpaid">{formatVnd(data.totalDebt)}</div>
+          </div>
+          <div className="flex flex-col gap-0.5 rounded-2xl border border-line bg-white p-3">
+            <div className="text-[11px] text-muted">Tiền hàng đã thanh toán</div>
+            <div className="text-base font-extrabold text-paid">
+              {formatVnd(data.totalPaidAmount)}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -158,10 +182,19 @@ function ReportSkeleton() {
         ))}
       </div>
       <Skeleton className="h-[92px] rounded-[20px]" />
+      <Skeleton className="h-[64px] rounded-2xl" />
       <div className="grid grid-cols-3 gap-2">
         {Array.from({ length: 3 }, (_, i) => (
           <Skeleton key={i} className="h-[60px] rounded-2xl" />
         ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-20 rounded" />
+        <div className="grid grid-cols-2 gap-2">
+          {Array.from({ length: 2 }, (_, i) => (
+            <Skeleton key={i} className="h-[58px] rounded-2xl" />
+          ))}
+        </div>
       </div>
     </div>
   );
