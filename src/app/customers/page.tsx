@@ -7,7 +7,7 @@ import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { useHeaderSearch } from "@/lib/header-search-context";
 import { normalizeSearchText } from "@/lib/search";
-import { PhoneIcon } from "@/components/icons";
+import { PencilIcon, PhoneIcon } from "@/components/icons";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
 export default function CustomersPage() {
@@ -36,6 +36,13 @@ function CustomersScreen({
 
   const [selected, setSelected] = useState<CustomerDTO | null>(null);
   const [collecting, setCollecting] = useState(false);
+
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const { query } = useHeaderSearch();
   const filteredCustomers = useMemo(() => {
@@ -73,6 +80,39 @@ function CustomersScreen({
     onChanged();
   }
 
+  function openEdit() {
+    if (!selected) return;
+    setEditName(selected.name);
+    setEditPhone(selected.phone ?? "");
+    setEditAddress(selected.address ?? "");
+    setEditError(null);
+    setEditingCustomer(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!selected) return;
+    setEditError(null);
+    setEditSaving(true);
+    const result = await apiMutate<{
+      id: string;
+      name: string;
+      phone: string | null;
+      address: string | null;
+    }>(`/api/customers/${selected.id}`, "PATCH", {
+      name: editName,
+      phone: editPhone || null,
+      address: editAddress || null,
+    });
+    setEditSaving(false);
+    if ("error" in result) {
+      setEditError(result.error);
+      return;
+    }
+    setSelected({ ...selected, ...result.data });
+    setEditingCustomer(false);
+    onChanged();
+  }
+
   return (
     <div className="flex flex-col gap-3 px-4 py-3.5">
       <button
@@ -105,10 +145,14 @@ function CustomersScreen({
             key={c.id}
             role="button"
             tabIndex={0}
-            onClick={() => setSelected(c)}
+            onClick={() => {
+              setEditingCustomer(false);
+              setSelected(c);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
+                setEditingCustomer(false);
                 setSelected(c);
               }
             }}
@@ -185,53 +229,117 @@ function CustomersScreen({
         </button>
       </Sheet>
 
-      <Sheet open={selected !== null} onClose={() => setSelected(null)}>
+      <Sheet
+        open={selected !== null}
+        onClose={() => {
+          setSelected(null);
+          setEditingCustomer(false);
+        }}
+      >
         {selected && (
           <>
-            <div className="flex items-center gap-3">
-              {selected.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={selected.avatarUrl}
-                  alt={selected.name}
-                  className="size-11 flex-none rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex size-11 flex-none items-center justify-center rounded-full bg-primary-tint text-base font-extrabold text-primary-dark">
-                  {selected.name.trim()[0]}
-                </span>
-              )}
-              <div className="flex flex-col gap-0.5">
-                <div className="text-[15px] font-bold">{selected.name}</div>
-                {selected.phone ? (
-                  <a
-                    href={`tel:${selected.phone}`}
-                    className="flex w-fit items-center gap-1 text-xs font-semibold text-primary-dark"
-                  >
-                    <PhoneIcon className="size-[12px]" />
-                    {selected.phone}
-                  </a>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-3">
+                {selected.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selected.avatarUrl}
+                    alt={selected.name}
+                    className="size-11 flex-none rounded-full object-cover"
+                  />
                 ) : (
-                  <div className="text-xs text-muted">Chưa có SĐT</div>
+                  <span className="flex size-11 flex-none items-center justify-center rounded-full bg-primary-tint text-base font-extrabold text-primary-dark">
+                    {selected.name.trim()[0]}
+                  </span>
                 )}
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-[15px] font-bold">{selected.name}</div>
+                  {selected.phone ? (
+                    <a
+                      href={`tel:${selected.phone}`}
+                      className="flex w-fit items-center gap-1 text-xs font-semibold text-primary-dark"
+                    >
+                      <PhoneIcon className="size-[12px]" />
+                      {selected.phone}
+                    </a>
+                  ) : (
+                    <div className="text-xs text-muted">Chưa có SĐT</div>
+                  )}
+                </div>
               </div>
+              {!editingCustomer && (
+                <button
+                  type="button"
+                  onClick={openEdit}
+                  aria-label="Sửa thông tin khách hàng"
+                  className="flex size-8 flex-none items-center justify-center rounded-full border border-line bg-white text-primary-dark"
+                >
+                  <PencilIcon className="size-[15px]" />
+                </button>
+              )}
             </div>
 
-            {(selected.email || selected.address) && (
-              <div className="flex flex-col gap-1.5 rounded-2xl border border-line p-3.5 text-[13px]">
-                {selected.email && (
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted">Email</span>
-                    <span className="font-semibold">{selected.email}</span>
-                  </div>
-                )}
-                {selected.address && (
-                  <div className="flex justify-between gap-2">
-                    <span className="flex-none text-muted">Địa chỉ</span>
-                    <span className="text-right font-semibold">{selected.address}</span>
-                  </div>
-                )}
+            {editingCustomer ? (
+              <div className="flex flex-col gap-2.5 rounded-2xl border border-line p-3.5">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-muted">Tên khách</label>
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="rounded-[10px] border border-line px-3 py-3 text-base"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-muted">Số điện thoại</label>
+                  <input
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    inputMode="tel"
+                    className="rounded-[10px] border border-line px-3 py-3 text-base"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-muted">Địa chỉ</label>
+                  <input
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    className="rounded-[10px] border border-line px-3 py-3 text-base"
+                  />
+                </div>
+                {editError && <p className="text-xs font-semibold text-unpaid">{editError}</p>}
+                <div className="flex gap-2.5">
+                  <button
+                    onClick={() => setEditingCustomer(false)}
+                    className="flex-1 rounded-xl bg-[#F1F0F3] py-3.5 text-sm font-semibold text-ink"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={editSaving || !editName.trim()}
+                    className="flex-[1.4] rounded-xl bg-primary py-3.5 text-sm font-bold text-white disabled:opacity-60"
+                  >
+                    {editSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                  </button>
+                </div>
               </div>
+            ) : (
+              (selected.email || selected.address) && (
+                <div className="flex flex-col gap-1.5 rounded-2xl border border-line p-3.5 text-[13px]">
+                  {selected.email && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted">Email</span>
+                      <span className="font-semibold">{selected.email}</span>
+                    </div>
+                  )}
+                  {selected.address && (
+                    <div className="flex justify-between gap-2">
+                      <span className="flex-none text-muted">Địa chỉ</span>
+                      <span className="text-right font-semibold">{selected.address}</span>
+                    </div>
+                  )}
+                </div>
+              )
             )}
 
             <div className="flex justify-between rounded-2xl border border-line p-3.5 text-[13px]">

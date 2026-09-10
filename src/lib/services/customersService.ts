@@ -80,6 +80,32 @@ export const customersService = {
     return { data };
   },
 
+  async update(
+    id: string,
+    input: { name: string; phone: string | null; address: string | null },
+  ): Promise<
+    | { data: { id: string; name: string; phone: string | null; address: string | null } }
+    | { error: string }
+  > {
+    const name = input.name.trim();
+    if (!name) return { error: "Vui lòng nhập tên khách hàng" };
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("customers")
+      .update({
+        name,
+        phone: input.phone?.trim() || null,
+        address: input.address?.trim() || null,
+      })
+      .eq("id", id)
+      .select("id, name, phone, address")
+      .single();
+
+    if (error) throw error;
+    return { data };
+  },
+
   /**
    * Mirrors collectDebt() from the design prototype — but since debt is
    * derived (see customer_debts view / migration 0001), "collecting" it
