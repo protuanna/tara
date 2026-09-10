@@ -305,6 +305,15 @@ export const ordersService = {
    * order marked as void instead of e.g. a refund, which this app has no
    * flow for. Looked up server-side, never trust a client-side check for
    * this.
+   *
+   * No `fulfillment_status` guard — a `"done"` order can be cancelled too
+   * (e.g. delivered on credit, then the sale falls through and the shop
+   * writes it off), not just pending/processing ones. If the order was
+   * `payment_status = "debt"`, reset it to `"unpaid"`/`"unpaid"` (the same
+   * pair a freshly-created order starts with) so `customer_debts` — which
+   * sums `payment_status = 'debt'` with no fulfillment filter — stops
+   * counting it; otherwise a cancelled order would still show up as money
+   * owed.
    */
   async cancel(id: string): Promise<{ ok: true } | { error: string }> {
     const supabase = await createClient();
@@ -322,7 +331,11 @@ export const ordersService = {
 
     const { error } = await supabase
       .from("orders")
-      .update({ fulfillment_status: "cancel" })
+      .update(
+        order.payment_status === "debt"
+          ? { fulfillment_status: "cancel", payment_status: "unpaid", payment_method: "unpaid" }
+          : { fulfillment_status: "cancel" },
+      )
       .eq("id", id);
     if (error) throw error;
 

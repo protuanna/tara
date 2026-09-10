@@ -123,9 +123,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div className="text-[15px] font-extrabold">
               {order.customers?.name ?? "Khách lẻ"}
             </div>
-            <div className="text-[11.5px] text-muted">
-              {formatOrderTime(order.created_at)} · {itemCount} món
-            </div>
+            <div className="text-[11.5px] text-muted">{formatOrderTime(order.created_at)}</div>
           </div>
           <div
             className={`flex-none whitespace-nowrap rounded-full px-2.5 py-1 text-[10.5px] font-bold ${fulfillment.bg} ${fulfillment.fg}`}
@@ -171,7 +169,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="flex items-baseline justify-between">
-          <span className="text-sm font-bold">Khách phải trả</span>
+          <span className="text-sm font-bold">Khách phải trả · {itemCount} món</span>
           <span className="text-lg font-extrabold text-primary-dark">
             {formatVnd(order.total)}
           </span>
