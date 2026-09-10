@@ -11,6 +11,7 @@ import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { OrderStatusActions } from "@/components/order-status-actions";
 import { CollectOrderPayment } from "@/components/collect-order-payment";
+import { PhoneIcon } from "@/components/icons";
 import type {
   OrderListRow,
   StatusCounts,
@@ -177,6 +178,7 @@ function OrdersContent() {
             order.fulfillment_status === "pending" || order.fulfillment_status === "processing";
           const showCollectPayment =
             order.fulfillment_status === "done" && order.payment_status === "debt";
+          const phone = order.customers?.phone;
 
           return (
             <Link
@@ -192,10 +194,30 @@ function OrdersContent() {
                     {PAYMENT_METHOD_LABEL[order.payment_method]}
                   </div>
                 </div>
-                <div
-                  className={`flex-none whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${fulfillment.bg} ${fulfillment.fg}`}
-                >
-                  {fulfillment.label}
+                <div className="flex flex-none items-center gap-2">
+                  {phone && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        // Same preventDefault()-not-stopPropagation() rule as
+                        // OrderStatusActions: this lets the click still reach
+                        // the row Link's own handler, which then sees
+                        // defaultPrevented and skips its navigation, instead
+                        // of falling through to a full-page reload.
+                        e.preventDefault();
+                        window.location.href = `tel:${phone}`;
+                      }}
+                      aria-label={`Gọi ${phone}`}
+                      className="flex size-[26px] items-center justify-center rounded-full border border-line bg-white text-primary-dark"
+                    >
+                      <PhoneIcon className="size-[13px]" />
+                    </button>
+                  )}
+                  <div
+                    className={`flex-none whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${fulfillment.bg} ${fulfillment.fg}`}
+                  >
+                    {fulfillment.label}
+                  </div>
                 </div>
               </div>
 

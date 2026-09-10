@@ -9,7 +9,7 @@ import { formatOrderTime } from "@/lib/date";
 import { FULFILLMENT_LABEL, PAYMENT_LABEL } from "@/lib/order-labels";
 import { OrderStatusActions } from "@/components/order-status-actions";
 import { CollectOrderPayment } from "@/components/collect-order-payment";
-import { PencilIcon, ShareIcon } from "@/components/icons";
+import { PencilIcon, PhoneIcon, ShareIcon } from "@/components/icons";
 import { QrCode } from "@/components/qr-code";
 import { ReceiptTemplate } from "@/components/receipt-template";
 import { Skeleton } from "@/components/skeleton";
@@ -124,6 +124,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {order.customers?.name ?? "Khách lẻ"}
             </div>
             <div className="text-[11.5px] text-muted">{formatOrderTime(order.created_at)}</div>
+            {order.customers?.phone && (
+              <a
+                href={`tel:${order.customers.phone}`}
+                className="mt-0.5 flex w-fit items-center gap-1 text-[12px] font-semibold text-primary-dark"
+              >
+                <PhoneIcon className="size-[13px]" />
+                {order.customers.phone}
+              </a>
+            )}
           </div>
           <div
             className={`flex-none whitespace-nowrap rounded-full px-2.5 py-1 text-[10.5px] font-bold ${fulfillment.bg} ${fulfillment.fg}`}

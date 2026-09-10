@@ -31,7 +31,7 @@ export type OrderListRow = {
   payment_status: PaymentStatus;
   payment_method: PaymentMethod;
   customer_id: string;
-  customers: { name: string } | null;
+  customers: { name: string; phone: string | null } | null;
   order_items: { qty: number }[];
 };
 
@@ -48,7 +48,7 @@ export type OrderDetailDTO = {
   fulfillment_status: FulfillmentStatus;
   payment_status: PaymentStatus;
   customer_id: string;
-  customers: { name: string } | null;
+  customers: { name: string; phone: string | null } | null;
   order_items: { id: string; product_id: string | null; name: string; price: number; qty: number }[];
   payos_qr_code: string | null;
   payos_checkout_url: string | null;
@@ -68,7 +68,7 @@ export const ordersService = {
     let query = supabase
       .from("orders")
       .select(
-        "id, created_at, total, fulfillment_status, payment_status, payment_method, customer_id, customers(name), order_items(qty)",
+        "id, created_at, total, fulfillment_status, payment_status, payment_method, customer_id, customers(name, phone), order_items(qty)",
       )
       .order("created_at", { ascending: false });
 
@@ -111,7 +111,7 @@ export const ordersService = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, created_at, subtotal, fee, topping_fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name), order_items(id, product_id, name, price, qty), payos_qr_code, payos_checkout_url",
+        "id, created_at, subtotal, fee, topping_fee, discount_amount, total, fulfillment_status, payment_status, customer_id, customers(name, phone), order_items(id, product_id, name, price, qty), payos_qr_code, payos_checkout_url",
       )
       .eq("id", id)
       .returns<OrderDetailDTO[]>()

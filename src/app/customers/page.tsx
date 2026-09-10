@@ -7,6 +7,7 @@ import { Sheet } from "@/components/sheet";
 import { Skeleton } from "@/components/skeleton";
 import { useHeaderSearch } from "@/lib/header-search-context";
 import { normalizeSearchText } from "@/lib/search";
+import { PhoneIcon } from "@/components/icons";
 import type { CustomerDTO } from "@/lib/services/customersService";
 
 export default function CustomersPage() {
@@ -96,9 +97,21 @@ function CustomersScreen({
           </div>
         )}
         {filteredCustomers.map((c) => (
-          <button
+          // A <button> can't validly nest another <button> (the call
+          // button below), so this row is a div with a button role instead
+          // of a real <button> — same click-to-open-sheet behavior, keyboard
+          // accessible via tabIndex + Enter/Space.
+          <div
             key={c.id}
+            role="button"
+            tabIndex={0}
             onClick={() => setSelected(c)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSelected(c);
+              }
+            }}
             className="flex items-center gap-3 border-b border-primary-tint p-3.5 text-left last:border-b-0"
           >
             {c.avatarUrl ? (
@@ -119,12 +132,25 @@ function CustomersScreen({
                 {c.phone || "Chưa có SĐT"} · {c.orderCount} đơn · {formatVnd(c.totalSpent)}
               </span>
             </span>
+            {c.phone && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.location.href = `tel:${c.phone}`;
+                }}
+                aria-label={`Gọi ${c.phone}`}
+                className="flex size-8 flex-none items-center justify-center rounded-full border border-line bg-white text-primary-dark"
+              >
+                <PhoneIcon className="size-[14px]" />
+              </button>
+            )}
             {c.debt > 0 && (
               <span className="flex-none whitespace-nowrap rounded-full bg-[#FFF2E2] px-2.5 py-1 text-[11px] font-bold text-processing">
                 Nợ {formatVnd(c.debt)}
               </span>
             )}
-          </button>
+          </div>
         ))}
       </div>
 
@@ -177,7 +203,17 @@ function CustomersScreen({
               )}
               <div className="flex flex-col gap-0.5">
                 <div className="text-[15px] font-bold">{selected.name}</div>
-                <div className="text-xs text-muted">{selected.phone || "Chưa có SĐT"}</div>
+                {selected.phone ? (
+                  <a
+                    href={`tel:${selected.phone}`}
+                    className="flex w-fit items-center gap-1 text-xs font-semibold text-primary-dark"
+                  >
+                    <PhoneIcon className="size-[12px]" />
+                    {selected.phone}
+                  </a>
+                ) : (
+                  <div className="text-xs text-muted">Chưa có SĐT</div>
+                )}
               </div>
             </div>
 
