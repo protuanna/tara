@@ -96,9 +96,9 @@ function ReportContent() {
       </div>
 
       <div className="flex flex-col gap-3 rounded-[20px] bg-gradient-to-br from-primary to-primary-dark p-4 text-white">
-        <div className="flex flex-col gap-0.5">
+        <div className="flex items-center justify-between">
           <div className="text-[12.5px] opacity-85">Tổng doanh thu kỳ này</div>
-          <div className="text-[29px] font-extrabold tracking-tight">{formatVnd(data.revenue)}</div>
+          <div className="text-[22px] font-extrabold tracking-tight">{formatVnd(data.revenue)}</div>
         </div>
         <div className="h-px bg-white/20" />
         <div className="flex items-center justify-between">
